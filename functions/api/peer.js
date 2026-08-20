@@ -12,6 +12,9 @@ const CORS = {
 const UA = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36', 'Accept': 'text/html,application/json' };
 const round = (v, d) => (v == null || !isFinite(v)) ? null : Math.round(v * 10 ** d) / 10 ** d;
 const numly = s => { if (s == null) return null; const v = parseFloat(String(s).replace(/,/g, '')); return isNaN(v) ? null : v; };
+// growth helpers — CAGR and simple growth, returned as a percent (null when undefined/non-positive base)
+const cagrPct = (nv, ov, yrs) => (nv > 0 && ov > 0 && yrs > 0) ? (Math.pow(nv / ov, 1 / yrs) - 1) * 100 : null;
+const growPct = (nv, ov) => (nv != null && isFinite(nv) && ov > 0) ? (nv / ov - 1) * 100 : null;
 
 function screenerRow(html, label) {
   const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -64,10 +67,24 @@ async function fromScreener(code) {
     }
     capex = Math.abs(sum / k) / revLtm * 100;
   }
+  // growth metrics — last screener column is TTM; annual figures exclude it.
+  // 3y CAGR: latest full year vs the year three prior. LTM growth: TTM vs latest full year.
+  let rev3 = null, eb3 = null, revLtmG = null, ebLtmG = null;
+  if (sales && sales.length >= 2) {
+    const annR = sales.slice(0, -1);
+    if (annR.length >= 4) rev3 = cagrPct(annR[annR.length - 1], annR[annR.length - 4], 3);
+    if (annR.length >= 1) revLtmG = growPct(last(sales), annR[annR.length - 1]);
+  }
+  if (opProfit && opProfit.length >= 2) {
+    const annE = opProfit.slice(0, -1);
+    if (annE.length >= 4) eb3 = cagrPct(annE[annE.length - 1], annE[annE.length - 4], 3);
+    if (annE.length >= 1) ebLtmG = growPct(last(opProfit), annE[annE.length - 1]);
+  }
   return {
     symbol: code, name, currency: 'INR', source: 'screener.in (consolidated)',
     mult: round(mult, 1), days: days == null ? null : round(days, 0),
     capex: capex == null ? null : round(capex, 1), da: da == null ? null : round(da, 1),
+    rev3: round(rev3, 1), eb3: round(eb3, 1), revLtmG: round(revLtmG, 1), ebLtmG: round(ebLtmG, 1),
     asOf: { price: new Date().toISOString(), balance: 'latest annual filing' },
   };
 }
@@ -106,10 +123,19 @@ async function fromYahoo(symbol) {
   const daRaw = lastRaw(yseries(ts, 'trailingReconciledDepreciation')) || lastRaw(yseries(ts, 'annualReconciledDepreciation'));
   const da = daRaw ? daRaw / rev * 100 : null;
   const caLast = ca.length ? ca[ca.length - 1] : null;
+  // growth metrics — 3y CAGR from annual series; LTM growth = trailing vs latest full year
+  const annRev = yseries(ts, 'annualTotalRevenue'), annEb = yseries(ts, 'annualEBITDA');
+  const trR = lastRaw(yseries(ts, 'trailingTotalRevenue')), trE = lastRaw(yseries(ts, 'trailingEBITDA'));
+  let rev3 = null, eb3 = null, revLtmG = null, ebLtmG = null;
+  if (annRev.length >= 4) rev3 = cagrPct(annRev[annRev.length - 1].raw, annRev[annRev.length - 4].raw, 3);
+  if (annRev.length >= 1 && trR != null) revLtmG = growPct(trR, annRev[annRev.length - 1].raw);
+  if (annEb.length >= 4) eb3 = cagrPct(annEb[annEb.length - 1].raw, annEb[annEb.length - 4].raw, 3);
+  if (annEb.length >= 1 && trE != null) ebLtmG = growPct(trE, annEb[annEb.length - 1].raw);
   return {
     symbol, name: meta.shortName || meta.longName || symbol, currency: meta.currency, source: 'Yahoo Finance',
     mult: round(ev / ebitda, 1), days: days == null ? null : round(days, 0),
     capex: capex == null ? null : round(capex, 1), da: da == null ? null : round(da, 1),
+    rev3: round(rev3, 1), eb3: round(eb3, 1), revLtmG: round(revLtmG, 1), ebLtmG: round(ebLtmG, 1),
     asOf: { price: meta.regularMarketTime ? new Date(meta.regularMarketTime * 1000).toISOString() : null, balance: caLast ? caLast.d : null },
   };
 }
