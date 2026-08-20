@@ -119,10 +119,11 @@
   <div class="panel">
     <h2>Business &amp; Required Return</h2>
     <div class="prm"><label for="iG">Revenue CAGR — Next X Years<button class="info" data-info="g1">i</button></label><input type="range" id="iG" min="0" max="40" step="0.5" value="10"><output id="iGo">10.0%</output></div>
-    <div class="prm"><label for="iX">Years to Steady-State<button class="info" data-info="xyears">i</button></label><input type="range" id="iX" min="1" max="30" step="1" value="10"><output id="iXo">10</output></div>
+    <div class="prm"><label for="iX">High-Growth Years<button class="info" data-info="xyears">i</button></label><input type="range" id="iX" min="1" max="30" step="1" value="10"><output id="iXo">10</output></div>
     <div class="prm"><label for="iGT">Terminal Growth<button class="info" data-info="gterm">i</button></label><input type="range" id="iGT" min="0" max="8" step="0.25" value="3"><output id="iGTo">3.00%</output></div>
     <div class="prm"><label for="iM">EBITDA Margin — Current<button class="info" data-info="margin">i</button></label><input type="range" id="iM" min="3" max="60" step="0.5" value="15"><output id="iMo">15.0%</output></div>
     <div class="prm"><label for="iMT">EBITDA Margin — Terminal<button class="info" data-info="marginT">i</button></label><input type="range" id="iMT" min="3" max="60" step="0.5" value="15"><output id="iMTo">15.0%</output></div>
+    <div class="prm"><label for="iRampM">Margin — Ramp to Steady State, <em>yrs</em><button class="info" data-info="rampM">i</button></label><input type="range" id="iRampM" min="1" max="30" step="1" value="10"><output id="iRampMo">10</output></div>
     <div class="prm"><label for="iCV">Cash Conversion of EBITDA<button class="info" data-info="conv">i</button></label><input type="range" id="iCV" min="50" max="110" step="1" value="100"><output id="iCVo">100%</output></div>
     <div class="prm" style="margin-top:10px"><label for="iW" style="font-weight:600; color:var(--ink-1)">Required Return<button class="info" data-info="reqret">i</button></label><input type="range" id="iW" min="6" max="30" step="0.25" value="15"><output id="iWo">15.00%</output></div>
     <div class="prm"><label for="iT">Tax Rate</label><input type="range" id="iT" min="0" max="40" step="1" value="25"><output id="iTo">25%</output></div>
@@ -132,9 +133,11 @@
     <h2>Capital Intensity</h2>
     <div class="prm"><label for="iD">NWC Days — Current, Avg</label><input type="range" id="iD" min="-90" max="120" step="1" value="-30"><output id="iDo">(30d)</output></div>
     <div class="prm"><label for="iDT">NWC Days — Terminal</label><input type="range" id="iDT" min="-90" max="120" step="1" value="-30"><output id="iDTo">(30d)</output></div>
+    <div class="prm"><label for="iRampD">NWC — Ramp to Steady State, <em>yrs</em><button class="info" data-info="rampD">i</button></label><input type="range" id="iRampD" min="1" max="30" step="1" value="10"><output id="iRampDo">10</output></div>
     <div class="prm"><label for="iFI">Float Interest Rate, p.a.</label><input type="range" id="iFI" min="0" max="10" step="0.25" value="0"><output id="iFIo">0.00%</output></div>
     <div class="prm"><label for="iC">Capex — Current, <em>% of Revenue</em><button class="info" data-info="capex">i</button></label><input type="range" id="iC" min="0" max="20" step="0.1" value="1.2"><output id="iCo">1.2%</output></div>
     <div class="prm"><label for="iCT">Capex — Terminal, <em>% of Revenue</em><button class="info" data-info="capexT">i</button></label><input type="range" id="iCT" min="0" max="20" step="0.1" value="1.2"><output id="iCTo">1.2%</output></div>
+    <div class="prm"><label for="iRampC">Capex — Ramp to Steady State, <em>yrs</em><button class="info" data-info="rampC">i</button></label><input type="range" id="iRampC" min="1" max="30" step="1" value="10"><output id="iRampCo">10</output></div>
     <div class="prm"><label for="iDelta">D&amp;A Rate, <em>% of NFA</em></label><input type="range" id="iDelta" min="1" max="50" step="1" value="20"><output id="iDeltao">20%</output></div>
     <div class="prm"><label for="iS">SBC, <em>% of Revenue</em></label><input type="range" id="iS" min="0" max="12" step="0.1" value="0"><output id="iSo">0.0%</output></div>
     <div class="prm"><label>SBC Priced at<button class="info" data-info="sbcmode">i</button></label>
@@ -217,7 +220,7 @@
   <h2>Notes and Conventions</h2>
   <ul style="margin:2px 0 0 0; padding-left:18px; font-size:12px; color:var(--ink-2); line-height:1.6">
     <li>EBITDA is stated <b>post-rental</b> (rent/lease charged above EBITDA; pre-Ind-AS-116). It is not added back.</li>
-    <li>Transition: revenue growth, working-capital days, capex and EBITDA margin <b>ramp linearly from current to terminal over the years-to-steady-state horizon</b>, reaching steady state together. Terminal capex is the maintenance level; growth capex fades with growth on top of it.</li>
+    <li>Transition: revenue growth reverts over the <b>high-growth years</b>; EBITDA margin, capex and NWC days each ramp linearly from current to terminal over <b>their own years-to-steady-state</b> (set independently). Terminal capex is the maintenance level; growth capex fades with growth on top of it.</li>
     <li>Working-capital days: <b>average balance, on sales</b> (average NWC ÷ revenue × 365), applied to the company and all peers.</li>
     <li>Float interest: earned on the <b>average annual float balance</b>, after tax, where working capital is negative.</li>
     <li>Asset turnover and the D&amp;A rate: on the <b>average net-fixed-asset base</b> (opening and closing).</li>
@@ -235,6 +238,7 @@ const S = {
   g1: 0.10, X: 10, gT: 0.03, m: 0.15, mT: 0.15, conv: 1.00, tax: 0.25, basis: 'LTM',
   w: 0.15,   // required return — stated directly, no CAPM build-up
   days: -30, daysT: -30, capex: 0.012, capexT: 0.012, delta: 0.20, sbc: 0, fir: 0,
+  rampM: 10, rampC: 10, rampD: 10,   // independent years-to-steady-state: margin, capex, NWC days
   mkt: 25, sbcMode: 'MKT',   // SBC priced as dilution at market price by default
 };
 /* derived capital identities (same as the Capital-Efficiency tool) */
@@ -264,14 +268,17 @@ function engine(wOv, prof) {
   if (w <= S.gT + 0.002) return { ok: false };
   const p = prof ?? dialProf();
   const da0 = p.da, daT = p.daT, f = p.f, sbc = p.sbc;
-  /* single terminal regime: growth, WC days, capex (maintenance) and margin all reach
-     terminal at the shared "years to steady-state" horizon (S.X). */
-  const d0 = p.days, dT = p.daysT, nY = Math.max(S.X, 1);
-  const H1 = Math.max(S.X, 1) + 1;
-  const ramp = (a, b, t) => t >= nY ? b : a + (b - a) * t / nY;
-  const dAt = t => ramp(d0, dT, t);
-  const mAt = t => ramp(S.m, S.mT, t);        // EBITDA margin ramps current → terminal
-  const daAt = t => ramp(da0, daT, t);        // maintenance / D&A rate ramps current → terminal
+  /* Independent transition horizons: revenue growth reverts over High-Growth Years (S.X);
+     EBITDA margin, capex (maintenance) and NWC days each ramp over their own years-to-steady-state.
+     The explicit forecast runs until every ramp has completed, then the Gordon terminal applies. */
+  const d0 = p.days, dT = p.daysT;
+  const nM = Math.max(S.rampM, 1), nC = Math.max(S.rampC, 1), nD = Math.max(S.rampD, 1);
+  const nEnd = Math.max(S.X, nM, nC, nD, 1);
+  const H1 = nEnd + 1;
+  const rampTo = (a, b, t, n) => t >= n ? b : a + (b - a) * t / n;
+  const dAt = t => rampTo(d0, dT, t, nD);
+  const mAt = t => rampTo(S.m, S.mT, t, nM);   // EBITDA margin ramps current → terminal
+  const daAt = t => rampTo(da0, daT, t, nC);   // maintenance / D&A rate ramps current → terminal
   const kd = (g, d) => (d/365) * 2 * (1 + g) / (2 + g);
   const rev = [1], gs = [S.g1];
   for (let t = 1; t <= H1; t++) { const g = t <= S.X ? S.g1 : S.gT; gs.push(g); rev.push(rev[t-1]*(1+g)); }
@@ -372,14 +379,17 @@ const hideTT = () => tt.style.display = 'none';
  ['iGT', v => S.gT = v/100, v => v.toFixed(2)+'%'],
  ['iM', v => S.m = v/100, v => v.toFixed(1)+'%'],
  ['iMT', v => S.mT = v/100, v => v.toFixed(1)+'%'],
+ ['iRampM', v => S.rampM = v, v => v.toFixed(0)],
  ['iCV', v => S.conv = v/100, v => v.toFixed(0)+'%'],
  ['iW', v => S.w = v/100, v => v.toFixed(2)+'%'],
  ['iT', v => S.tax = v/100, v => v.toFixed(0)+'%'],
  ['iD', v => S.days = v, v => fmtDays(v)],
  ['iDT', v => S.daysT = v, v => fmtDays(v)],
+ ['iRampD', v => S.rampD = v, v => v.toFixed(0)],
  ['iFI', v => S.fir = v/100, v => v.toFixed(2)+'%'],
  ['iC', v => S.capex = v/100, v => v.toFixed(1)+'%'],
  ['iCT', v => S.capexT = v/100, v => v.toFixed(1)+'%'],
+ ['iRampC', v => S.rampC = v, v => v.toFixed(0)],
  ['iDelta', v => S.delta = v/100, v => v.toFixed(0)+'%'],
  ['iS', v => S.sbc = v/100, v => v.toFixed(1)+'%'],
 
@@ -854,7 +864,10 @@ const INFO = {
   recon: 'Every number in the fair multiple, year by year: the operating stream and each capital flow, discounted and summed. The final row reproduces the hero tile on an NTM basis.',
   reqret: 'Discount rate applied to all cash flows. Keep consistent with the currency of the cash flows.',
   g1: 'Revenue growth over the forecast horizon.',
-  xyears: 'Shared years-to-steady-state horizon. Revenue growth, working-capital days, capex and EBITDA margin all ramp linearly from their current to their terminal values over this window, reaching steady state together.',
+  xyears: 'Years of stage-one revenue growth before reverting to the terminal rate. Independent of the margin, capex and NWC ramps.',
+  rampM: 'Years over which the EBITDA margin ramps linearly from current to terminal. Independent of the high-growth horizon and of the capex and NWC ramps.',
+  rampC: 'Years over which capex ramps linearly from current to its terminal (maintenance) level. Independent of the other horizons.',
+  rampD: 'Years over which NWC days ramp linearly from current to terminal. Independent of the other horizons.',
   gterm: 'Perpetual growth rate beyond the forecast. Must be below the required return.',
   margin: 'EBITDA margin today (year one). Ramps to the terminal margin over the years-to-steady-state horizon.',
   marginT: 'Steady-state EBITDA margin, reached at the end of the years-to-steady-state horizon. Margin scales EBITDA and EV together, so it moves the fair multiple only through its effect on capital intensity per turn of EBITDA.',
