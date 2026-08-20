@@ -121,10 +121,9 @@
     <div class="prm"><label for="iG">LTM Revenue Growth<button class="info" data-info="g1">i</button></label><input type="range" id="iG" min="0" max="40" step="0.5" value="10"><output id="iGo">10.0%</output></div>
     <div class="prm"><label for="iX">Glide-Path Duration, <em>yrs to terminal</em><button class="info" data-info="xyears">i</button></label><input type="range" id="iX" min="1" max="30" step="1" value="10"><output id="iXo">10</output></div>
     <div class="prm"><label for="iGT">Terminal Growth<button class="info" data-info="gterm">i</button></label><input type="range" id="iGT" min="0" max="8" step="0.25" value="3"><output id="iGTo">3.00%</output></div>
-    <div class="prm"><label for="iM">EBITDA Margin — Current<button class="info" data-info="margin">i</button></label><input type="range" id="iM" min="3" max="60" step="0.5" value="15"><output id="iMo">15.0%</output></div>
+    <div class="prm"><label for="iM">LTM EBITDA Margin<button class="info" data-info="margin">i</button></label><input type="range" id="iM" min="3" max="60" step="0.5" value="15"><output id="iMo">15.0%</output></div>
     <div class="prm"><label for="iMT">EBITDA Margin — Terminal<button class="info" data-info="marginT">i</button></label><input type="range" id="iMT" min="3" max="60" step="0.5" value="15"><output id="iMTo">15.0%</output></div>
     <div class="prm"><label for="iRampM">Margin — Ramp to Steady State, <em>yrs</em><button class="info" data-info="rampM">i</button></label><input type="range" id="iRampM" min="1" max="30" step="1" value="10"><output id="iRampMo">10</output></div>
-    <div class="prm"><label for="iCV">Cash Conversion of EBITDA<button class="info" data-info="conv">i</button></label><input type="range" id="iCV" min="50" max="110" step="1" value="100"><output id="iCVo">100%</output></div>
     <div class="prm" style="margin-top:10px"><label for="iW" style="font-weight:600; color:var(--ink-1)">Required Return<button class="info" data-info="reqret">i</button></label><input type="range" id="iW" min="6" max="30" step="0.25" value="15"><output id="iWo">15.00%</output></div>
     <div class="prm"><label for="iT">Tax Rate</label><input type="range" id="iT" min="0" max="40" step="1" value="25"><output id="iTo">25%</output></div>
     <div class="warn" id="warnW">Terminal growth must stay below the required return.</div>
@@ -384,7 +383,6 @@ const hideTT = () => tt.style.display = 'none';
  ['iM', v => S.m = v/100, v => v.toFixed(1)+'%'],
  ['iMT', v => S.mT = v/100, v => v.toFixed(1)+'%'],
  ['iRampM', v => S.rampM = v, v => v.toFixed(0)],
- ['iCV', v => S.conv = v/100, v => v.toFixed(0)+'%'],
  ['iW', v => S.w = v/100, v => v.toFixed(2)+'%'],
  ['iT', v => S.tax = v/100, v => v.toFixed(0)+'%'],
  ['iD', v => S.days = v, v => fmtDays(v)],
@@ -486,13 +484,11 @@ function buildCompsTable() {
     el('td', { text: fmtGr(c.revLtmG) }, tr);
     el('td', { text: fmtGr(c.ebLtmG) }, tr);
     const tdX = el('td', {}, tr);
-    if (COMPS.length > 2) {
-      const btn = el('button', { text:'×', title:'remove peer' }, tdX);
-      btn.style.cssText = 'font:inherit; font-size:12px; border:none; background:none; color:var(--ink-muted); cursor:pointer';
-      btn.addEventListener('click', () => { COMPS.splice(i, 1); recalcComps(); });
-    }
+    const btn = el('button', { text:'×', title:'remove peer' }, tdX);
+    btn.style.cssText = 'font:inherit; font-size:12px; border:none; background:none; color:var(--ink-muted); cursor:pointer';
+    btn.addEventListener('click', () => { COMPS.splice(i, 1); recalcComps(); });
   });
-  // summary rows — median and average, styled as part of the table
+  // summary rows — median and average, styled as part of the table (only when peers exist)
   const avg = {
     mult: mean(COMPS.map(c => c.mult)),
     days: mean(COMPS.map(c => c.days)),
@@ -503,7 +499,7 @@ function buildCompsTable() {
     revLtmG: mean(COMPS.map(c => c.revLtmG)),
     ebLtmG: mean(COMPS.map(c => c.ebLtmG)),
   };
-  [{ lab: 'Median', o: med, cls: 'sumrow med' }, { lab: 'Average', o: avg, cls: 'sumrow' }].forEach(s => {
+  if (COMPS.length) [{ lab: 'Median', o: med, cls: 'sumrow med' }, { lab: 'Average', o: avg, cls: 'sumrow' }].forEach(s => {
     const tr = el('tr', { 'class': s.cls }, tb);
     el('td', { text: s.lab }, tr);
     el('td', { text: isFinite(s.o.mult) ? fmtX(s.o.mult) : '—' }, tr);
@@ -854,7 +850,7 @@ refreshPeers(true);
 /* ---------- info popovers ---------- */
 const INFO = {
   overview: 'Fair multiple = operating multiple (step 1) + capital adjustment (step 2). Step 1 is the present value of the after-tax operating stream ÷ year-one EBITDA, before invested capital. Step 2 is the present value of the working-capital, capex, SBC and float-interest flows on the same basis.',
-  step1: 'Present value of after-tax, conversion-adjusted EBITDA over the forecast and its terminal value, divided by year-one EBITDA.',
+  step1: 'Present value of after-tax EBITDA over the forecast and its terminal value, divided by year-one EBITDA.',
   step2: 'Present value of the change in working capital, growth and maintenance capex net of the depreciation tax shield, SBC and float interest, divided by year-one EBITDA. Capital inputs are the capex ratio and the depreciation rate; the asset base is derived.',
   fair: 'Operating multiple plus capital adjustment, on a DCF basis.',
   conv: 'Share of EBITDA converting to cash in steady state, applied to every year. Excludes working capital (step 2) and lease expense (above EBITDA).',
@@ -873,7 +869,7 @@ const INFO = {
   rampC: 'Years over which capex ramps linearly from current to its terminal (maintenance) level. Independent of the other horizons.',
   rampD: 'Years over which NWC days ramp linearly from current to terminal. Independent of the other horizons.',
   gterm: 'Perpetual growth rate beyond the forecast. Must be below the required return.',
-  margin: 'EBITDA margin today (year one). Ramps to the terminal margin over the years-to-steady-state horizon.',
+  margin: 'Latest-twelve-month (trailing) EBITDA margin — the starting point of the margin path and the base the LTM multiple is quoted on. Ramps to the terminal margin over the margin years-to-steady-state. State it pre-ESOP; SBC is charged separately as dilution.',
   marginT: 'Steady-state EBITDA margin, reached at the end of the years-to-steady-state horizon. Margin scales EBITDA and EV together, so it moves the fair multiple only through its effect on capital intensity per turn of EBITDA.',
   capex: 'Total capex today as a share of revenue. Sets the current asset base and, with the D&A rate, the maintenance charge and the incremental growth-capital ratio.',
   capexT: 'Terminal capex as a share of revenue — the steady-state maintenance level to which capex normalises over the years-to-steady-state horizon. Growth capex continues to fade with growth on top of this.',
