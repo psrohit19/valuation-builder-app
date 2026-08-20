@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Valuation Builder — fair EV/EBITDA</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb; --page: #f9f9f7;
+    --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
+    --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-5: #e87ba4;
+    --div-neut: #f0efec; --bad: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root, body.viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page: #0d0d0d;
+      --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+      --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+      --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-5: #d55181;
+      --div-neut: #383835; --bad: #e66767;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink-1);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", sans-serif; font-size: 13px; line-height: 1.45; }
+  .wrap { max-width: 1150px; margin: 0 auto; padding: 26px 22px 60px 22px; }
+  .kicker { font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--ink-muted); font-weight: 500; }
+  h1 { font-size: 21px; margin: 4px 0 2px 0; font-weight: 600; letter-spacing: -0.2px; }
+  .sub { color: var(--ink-2); margin: 0 0 14px 0; max-width: 920px; font-size: 12.5px; }
+  .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 0; padding: 13px 16px; }
+  .panel h2 { font-size: 13px; font-weight: 600; margin: 0 0 8px 0; }
+  .toprow { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  @media (max-width: 900px) { .toprow { grid-template-columns: 1fr; } }
+  .prm { display: grid; grid-template-columns: 190px 1fr 84px; gap: 6px 10px; align-items: center; margin: 4px 0; }
+  .prm label { font-size: 12px; color: var(--ink-2); }
+  .prm output { font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--ink-muted); height: 18px; }
+  .warn { color: var(--bad); font-size: 12px; font-weight: 600; margin-top: 6px; display: none; }
+  .readout { display: grid; grid-template-columns: 190px 1fr; gap: 6px 10px; margin: 4px 0; font-size: 12px; }
+  .readout .k { color: var(--ink-muted); }
+  .readout .v { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .toggle { position: relative; display: inline-flex; background: var(--grid);
+    border: 1px solid var(--border); padding: 2px; width: fit-content; }
+  .toggle .thumb { position: absolute; top: 2px; left: 2px; width: calc(50% - 2px); height: calc(100% - 4px);
+    background: var(--surface-1); border: 1px solid var(--border);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.10);
+    transition: transform 0.25s cubic-bezier(0.32, 1.2, 0.6, 1); }
+  .toggle.ltm .thumb, .toggle.right .thumb { transform: translateX(100%); }
+  .toggle button { position: relative; z-index: 1; border: none; background: none; font: inherit;
+    font-size: 10.5px; font-weight: 500; letter-spacing: 0.4px; padding: 2.5px 0; width: 42px;
+    color: var(--ink-muted); cursor: pointer; transition: color 0.25s; }
+  .toggle button.active { color: var(--ink-1); font-weight: 600; }
+  .toggle button:hover:not(.active) { color: var(--ink-1); }
+  .tiles { display: grid; grid-template-columns: 1.15fr 1fr 1fr 1fr 1fr; gap: 10px; margin: 0 0 14px 0; }
+  @media (max-width: 1020px) { .tiles { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 700px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 0; padding: 12px 15px; }
+  .tile .lbl { font-size: 11px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+  .tile .val { font-size: 20px; font-weight: 600; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .tile .note { font-size: 10.5px; color: var(--ink-muted); margin-top: 2px; }
+  .tile.hero { border-left: 3px solid var(--ink-1); }
+  .chart-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 0; padding: 13px 16px 8px 16px; }
+  .chart-card h3 { font-size: 13px; font-weight: 600; margin: 0 0 1px 0; }
+  .chart-card .csub { font-size: 11.5px; color: var(--ink-muted); margin: 0 0 6px 0; }
+  svg { display: block; width: 100%; height: auto; }
+  svg text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", sans-serif; }
+  .tooltip { position: fixed; pointer-events: none; z-index: 50; background: var(--surface-1);
+    border: 1px solid var(--border); box-shadow: 0 4px 14px rgba(0,0,0,0.18); border-radius: 0;
+    padding: 8px 11px; font-size: 12px; display: none; min-width: 150px; }
+  .tooltip .tt-title { color: var(--ink-2); font-size: 11px; margin-bottom: 4px; }
+  .tooltip .tt-row { display: flex; align-items: center; gap: 7px; margin: 2px 0; }
+  .tooltip .tt-key { width: 12px; height: 2px; flex: 0 0 auto; }
+  .tooltip .tt-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tooltip .tt-name { color: var(--ink-2); }
+  table.data { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+  table.data th { text-align: right; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--ink-muted); font-weight: 600; padding: 5px 8px; border-bottom: 1px solid var(--baseline); }
+  table.data th:first-child, table.data td:first-child { text-align: left; }
+  table.data td { text-align: right; padding: 4.5px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  .info { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px;
+    border-radius: 0; border: 1px solid var(--baseline); background: none; color: var(--ink-muted);
+    font-size: 10px; font-weight: 700; font-style: italic; font-family: Georgia, serif; cursor: pointer;
+    padding: 0; line-height: 1; vertical-align: middle; margin-left: 6px; flex: 0 0 auto; }
+  .info:hover { color: var(--ink-1); border-color: var(--ink-muted); }
+  .popover { position: fixed; z-index: 60; max-width: 380px; font-weight: 400; background: var(--surface-1);
+    border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,0.22); border-radius: 0;
+    padding: 12px 15px; font-size: 12px; color: var(--ink-2); line-height: 1.55; display: none; }
+  .steptag { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase;
+    color: var(--ink-muted); border: 1px solid var(--baseline); padding: 1.5px 9px; margin-left: 8px; vertical-align: middle; }
+</style>
+</head>
+<body class="viz-root">
+<div class="wrap">
+
+<div class="kicker">Valuation Framework</div>
+<h1>Valuation Builder — fair EV/EBITDA</h1>
+<p class="sub">Fair EV/EBITDA in two components: operating multiple (step 1) and capital adjustment (step 2).<button class="info" data-info="overview">i</button></p>
+
+<div class="toprow">
+  <div class="panel">
+    <h2>Business &amp; required return</h2>
+    <div class="prm"><label for="iG">Revenue CAGR — next X years<button class="info" data-info="g1">i</button></label><input type="range" id="iG" min="0" max="40" step="0.5" value="10"><output id="iGo">10.0%</output></div>
+    <div class="prm"><label for="iX">High-growth years<button class="info" data-info="xyears">i</button></label><input type="range" id="iX" min="1" max="30" step="1" value="10"><output id="iXo">10</output></div>
+    <div class="prm"><label for="iGT">Terminal growth<button class="info" data-info="gterm">i</button></label><input type="range" id="iGT" min="0" max="8" step="0.25" value="3"><output id="iGTo">3.00%</output></div>
+    <div class="prm"><label for="iM">EBITDA margin<button class="info" data-info="margin">i</button></label><input type="range" id="iM" min="3" max="60" step="0.5" value="15"><output id="iMo">15.0%</output></div>
+    <div class="prm"><label for="iCV">Cash conversion of EBITDA<button class="info" data-info="conv">i</button></label><input type="range" id="iCV" min="50" max="110" step="1" value="100"><output id="iCVo">100%</output></div>
+    <div class="prm" style="margin-top:10px"><label for="iW" style="font-weight:600; color:var(--ink-1)">Required return<button class="info" data-info="reqret">i</button></label><input type="range" id="iW" min="6" max="30" step="0.25" value="15"><output id="iWo">15.00%</output></div>
+    <div class="prm"><label for="iT">Tax rate</label><input type="range" id="iT" min="0" max="40" step="1" value="25"><output id="iTo">25%</output></div>
+    <div class="warn" id="warnW">Terminal growth must stay below the required return.</div>
+  </div>
+  <div class="panel">
+    <h2>Capital intensity</h2>
+    <div class="prm"><label for="iD">NWC days — current, avg</label><input type="range" id="iD" min="-90" max="120" step="1" value="-30"><output id="iDo">(30d)</output></div>
+    <div class="prm"><label for="iDT">NWC days — terminal</label><input type="range" id="iDT" min="-90" max="120" step="1" value="-30"><output id="iDTo">(30d)</output></div>
+    <div class="prm"><label for="iFI">Float interest rate, p.a.</label><input type="range" id="iFI" min="0" max="10" step="0.25" value="0"><output id="iFIo">0.00%</output></div>
+    <div class="prm"><label for="iC">Capex, % of revenue</label><input type="range" id="iC" min="0" max="20" step="0.1" value="1.2"><output id="iCo">1.2%</output></div>
+    <div class="prm"><label for="iDelta">D&amp;A rate, % of NFA</label><input type="range" id="iDelta" min="1" max="50" step="1" value="20"><output id="iDeltao">20%</output></div>
+    <div class="prm"><label for="iS">SBC, % of revenue</label><input type="range" id="iS" min="0" max="12" step="0.1" value="0"><output id="iSo">0.0%</output></div>
+    <div class="prm"><label>SBC priced at<button class="info" data-info="sbcmode">i</button></label>
+      <div class="toggle right" id="sbcToggle"><span class="thumb"></span><button id="sFAIR">FAIR</button><button id="sMKT" class="active">MKT</button></div>
+      <output id="sbcNote">dilution at market price</output></div>
+    <div class="readout"><span class="k">Asset turnover (Rev ÷ avg NFA) — derived</span><span class="v" id="rTurn">—</span></div>
+    <div class="readout"><span class="k">D&amp;A, % of revenue — derived</span><span class="v" id="rDA">—</span></div>
+    <h2 style="margin-top:12px">Market</h2>
+    <div class="prm"><label for="iMK">Market EV/EBITDA<button class="info" data-info="mkt">i</button></label><input type="range" id="iMK" min="2" max="80" step="0.5" value="25"><output id="iMKo">25.0x</output></div>
+    <div class="prm"><label>Multiple basis<button class="info" data-info="basis">i</button></label>
+      <div class="toggle ltm" id="basisToggle"><span class="thumb"></span><button id="bNTM">NTM</button><button id="bLTM" class="active">LTM</button></div>
+      <output id="bNote">= NTM × (1+g₁)</output></div>
+  </div>
+</div>
+
+<div class="tiles">
+  <div class="tile hero">
+    <div class="lbl">Fair EV/EBITDA<button class="info" data-info="fair">i</button></div>
+    <div class="val" id="tFair">—</div>
+    <div class="note" id="tFairn">—</div>
+  </div>
+  <div class="tile">
+    <div class="lbl">Operating multiple<button class="info" data-info="step1">i</button></div>
+    <div class="val" id="tOp">—</div>
+    <div class="note">step 1, excludes capital intensity</div>
+  </div>
+  <div class="tile">
+    <div class="lbl">Capital adjustment<button class="info" data-info="step2">i</button></div>
+    <div class="val" id="tCap">—</div>
+    <div class="note" id="tCapn">—</div>
+  </div>
+  <div class="tile">
+    <div class="lbl">Vs market multiple</div>
+    <div class="val" id="tVs">—</div>
+    <div class="note" id="tVsn">—</div>
+  </div>
+  <div class="tile">
+    <div class="lbl">Terminal fair multiple<button class="info" data-info="termmult">i</button></div>
+    <div class="val" id="tTM">—</div>
+    <div class="note" id="tTMn">—</div>
+  </div>
+</div>
+
+<div class="chart-card" style="margin-bottom:14px">
+  <h3>Decomposition of the fair multiple<button class="info" data-info="bridge">i</button></h3>
+  <p class="csub" id="bridgeSub">—</p>
+  <div id="chartBridge"></div>
+</div>
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>Peer benchmark<button class="info" data-info="comps">i</button></h2>
+  <p style="font-size:12px; color:var(--ink-muted); margin:0 0 8px 0">Fair-relative multiple = peer-median EV/EBITDA + the capital-quality differential vs the median peer. India from Screener (consolidated), US from Yahoo; EV gross of cash. Metrics are outputs, not editable.</p>
+  <div style="overflow-x:auto"><table class="data" id="compsTable"></table></div>
+  <div style="margin-top:8px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+    <input id="cpSym" type="text" placeholder="Ticker — HINDUNILVR, NESTLEIND, PG…" spellcheck="false"
+      style="font:inherit; font-size:12px; padding:4px 9px; width:220px; background:var(--page); color:var(--ink-1); border:1px solid var(--baseline); border-radius:0">
+    <button id="addComp" style="font:inherit; font-size:12px; padding:4px 12px; border-radius:0; border:1px solid var(--baseline); background:var(--page); color:var(--ink-1); cursor:pointer">+ Add peer</button>
+    <button id="refreshComps" title="Refetch live data for all rows with a ticker" style="font:inherit; font-size:12px; padding:4px 12px; border-radius:0; border:1px solid var(--baseline); background:var(--page); color:var(--ink-1); cursor:pointer">↻ Refresh</button>
+    <span style="font-size:12px; color:var(--ink-2)">Median benchmark: <b id="rBase">—</b></span>
+  </div>
+  <div id="liveNote" style="margin-top:6px; font-size:11px; color:var(--ink-muted)">Add a peer by ticker (e.g. HINDUNILVR, NESTLEIND, PG). Metrics are fetched on entry.</div>
+  <div id="benchStrip" style="margin-top:10px; padding:11px 14px; background:var(--page); border:1px solid var(--border)">
+    <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--ink-muted); margin-bottom:5px">Your company vs the median peer</div>
+    <div id="benchGap" style="font-size:12.5px; color:var(--ink-2); line-height:1.7">—</div>
+  </div>
+</div>
+
+<div class="chart-card">
+  <h3>Assumptions consistent with the traded multiple<button class="info" data-info="isomap">i</button></h3>
+  <p class="csub" id="mapSub">—</p>
+  <div style="display:flex; gap:10px; margin:2px 0 6px 0; align-items:center; flex-wrap:wrap">
+    <span style="font-size:11px; color:var(--ink-muted)">X axis</span>
+    <select id="mapX" style="font:inherit; font-size:12px; padding:3px 6px; background:var(--page); color:var(--ink-1); border:1px solid var(--baseline); border-radius:0"></select>
+    <span style="font-size:11px; color:var(--ink-muted)">Y axis</span>
+    <select id="mapY" style="font:inherit; font-size:12px; padding:3px 6px; background:var(--page); color:var(--ink-1); border:1px solid var(--baseline); border-radius:0"></select>
+  </div>
+  <div id="chartMap"></div>
+  <p class="csub" id="mapDiag" style="margin:8px 2px 0 2px; line-height:1.55"></p>
+</div>
+
+<div class="panel" style="margin-top:14px">
+  <h2>Notes &amp; conventions</h2>
+  <ul style="margin:2px 0 0 0; padding-left:18px; font-size:12px; color:var(--ink-2); line-height:1.6">
+    <li>EBITDA is stated <b>post-rental</b> (rent/lease charged above EBITDA; pre-Ind-AS-116). It is not added back.</li>
+    <li>Working-capital days: <b>average balance, on sales</b> (average NWC ÷ revenue × 365), applied to the company and all peers.</li>
+    <li>Float interest: earned on the <b>average annual float balance</b>, after tax, where working capital is negative.</li>
+    <li>Asset turnover and the D&amp;A rate: on the <b>average net-fixed-asset base</b> (opening and closing).</li>
+  </ul>
+</div>
+
+</div>
+<div class="tooltip" id="tt"></div>
+
+<script>
+'use strict';
+/* ---------- state (single input set) ---------- */
+const S = {
+  g1: 0.10, X: 10, gT: 0.03, m: 0.15, conv: 1.00, tax: 0.25, basis: 'LTM',
+  w: 0.15,   // required return — stated directly, no CAPM build-up
+  days: -30, daysT: -30, capex: 0.012, delta: 0.20, sbc: 0, fir: 0,
+  mkt: 25, sbcMode: 'MKT',   // SBC priced as dilution at market price by default
+};
+/* derived capital identities (same as the Capital-Efficiency tool) */
+/* average-NFA conventions: D&A rate is on the AVERAGE net-fixed-asset base held through the year,
+   and asset turnover uses average NFA — consistent with the average-balance basis used for working capital. */
+const avgNfaPct = () => S.capex * (2 + S.g1) / (2 * S.g1 + S.delta * (2 + S.g1));
+const daPct = () => S.delta * avgNfaPct();
+const nfaPct = () => avgNfaPct();
+
+/* ---------- engine: one pass, both steps ----------
+   Turns of NTM EV/EBITDA: op (step 1), wc/cx/sb (step 2 split), cap, fair = op + cap.
+   prof overrides the capital profile (peer rows); default is the dial company. */
+function dialProf() {
+  const da = daPct();
+  return { days: S.days, daysT: S.daysT, da,
+    f: S.g1 > 0.001 ? (S.capex - da) * (1 + S.g1) / S.g1 : 0, sbc: S.sbc };
+}
+function peerProf(c) {
+  const da = c.da / 100;
+  return { days: c.days, daysT: c.days, da,
+    f: S.g1 > 0.001 ? Math.max(0, c.capex/100 - da) * (1 + S.g1) / S.g1 : 0, sbc: 0 };
+}
+function engine(wOv, prof) {
+  const w = wOv ?? S.w;
+  if (w <= S.gT + 0.002) return { ok: false };
+  const p = prof ?? dialProf();
+  const da = p.da, f = p.f, sbc = p.sbc;
+  /* single terminal regime: WC days reach terminal exactly when growth does (year X) */
+  const d0 = p.days, dT = p.daysT, nY = S.X;
+  const H1 = Math.max(S.X, 1) + 1;
+  const dAt = t => t >= nY ? dT : d0 + (dT - d0) * t / nY;
+  const kd = (g, d) => (d/365) * 2 * (1 + g) / (2 + g);
+  const rev = [1], gs = [S.g1];
+  for (let t = 1; t <= H1; t++) { const g = t <= S.X ? S.g1 : S.gT; gs.push(g); rev.push(rev[t-1]*(1+g)); }
+  const e1 = S.m * rev[1];
+  let op = 0, wc = 0, fx = 0, mt = 0, sb = 0, fi = 0, Bprev = kd(S.g1, d0) * rev[0];
+  const rows = [];
+  for (let t = 1; t <= H1; t++) {
+    const d = Math.pow(1 + w, t), dr = rev[t] - rev[t-1], dc = dAt(t);
+    const B = kd(gs[t], dc) * rev[t];
+    const vOp = (1 - S.tax) * S.conv * S.m * rev[t],
+          vWC = B - Bprev, vFX = f * dr,
+          vMT = (1 - S.tax) * da * rev[t], vSB = sbc * rev[t],
+          vFI = (dc < 0 && S.fir > 0) ? (1 - S.tax) * S.fir * (-dc/365) * rev[t] : 0;
+    op += vOp / d; wc += vWC / d; Bprev = B;
+    fx += vFX / d; mt += vMT / d; sb += vSB / d; fi += vFI / d;
+    const flow = vOp - vWC - vFX - vMT - vSB + vFI;
+    rows.push({ t, g: gs[t], rev: rev[t], ebitda: S.m * rev[t], opF: vOp, B,
+      dNWC: -vWC, gc: -vFX, mnt: -vMT, sbF: -vSB, fiF: vFI, flow, df: 1/d, pv: flow / d });
+  }
+  const dH = Math.pow(1 + w, H1), gp = w - S.gT, gr = rev[H1] * (1 + S.gT) / gp / dH;
+  const tvOp = (1 - S.tax) * S.conv * S.m * gr;
+  const tvWC = kd(S.gT, dT) * rev[H1] * S.gT / gp / dH,
+        tvFX = f * rev[H1] * S.gT / gp / dH,
+        tvMT = (1 - S.tax) * da * gr,
+        tvSB = sbc * gr,
+        tvFI = (dT < 0 && S.fir > 0) ? (1 - S.tax) * S.fir * (-dT/365) * gr : 0;
+  op += tvOp; wc += tvWC; fx += tvFX; mt += tvMT; sb += tvSB; fi += tvFI;
+  const tv = { opF: tvOp, dNWC: -tvWC, gc: -tvFX, mnt: -tvMT, sbF: -tvSB, fiF: tvFI,
+    pv: tvOp - tvWC - tvFX - tvMT - tvSB + tvFI };
+  const cap = (-wc - fx - mt - sb + fi) / e1;
+  return { ok: true, op: op/e1, wc: -wc/e1 + fi/e1, cx: -(fx+mt)/e1, sb: -sb/e1,
+    cap, fair: op/e1 + cap, tvShare: tvOp/op, e1, rows, tv };
+}
+const bf = () => S.basis === 'LTM' ? 1 + S.g1 : 1;
+/* fair multiple of the steady-state business (year X onward): Gordon on every stream.
+   SBC charged at fair value here — persistent mispricing is a transition assumption, not a terminal one. */
+function termMult() {
+  const gp = S.w - S.gT;
+  if (gp <= 0.002) return NaN;
+  const da = daPct(), f = dialProf().f;
+  const kT = (S.daysT/365) * 2 * (1 + S.gT) / (2 + S.gT);
+  const perRev = (1 - S.tax) * S.conv * S.m       // operating
+    - (1 - S.tax) * da                            // maintenance, net of shield
+    - f * S.gT / (1 + S.gT)                       // growth capex at terminal growth
+    - kT * S.gT / (1 + S.gT)                      // NWC change (credit when days < 0)
+    - S.sbc                                       // SBC at fair value
+    + ((S.daysT < 0 && S.fir > 0) ? (1 - S.tax) * S.fir * (-S.daysT/365) : 0);
+  const ntm = perRev / gp / S.m;                  // EV_X ÷ NTM EBITDA at X
+  return S.basis === 'LTM' ? ntm * (1 + S.gT) : ntm;
+}
+/* SBC as dilution at MARKET price: value transferred to employees each year
+   = SBC$ × (fair value ÷ market price). The circularity (fair depends on the
+   SBC drag, which depends on fair) solves in closed form:
+   fairB = baseB / (1 − sbB/mkt), where sbB (negative) is the fair-value SBC drag. */
+function fairAdj(r) {
+  const B = bf();
+  const baseB = (r.fair - r.sb) * B, sbB = r.sb * B;
+  if (S.sbcMode !== 'MKT' || sbB === 0) return { fairB: r.fair * B, sbB, k: 1 };
+  const fairB = baseB / (1 - sbB / S.mkt);
+  return { fairB, sbB: fairB - baseB, k: (fairB - baseB) / sbB };
+}
+/* market-implied return: w such that fair (display basis) = market multiple */
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const fmtT = v => v >= 0 ? v.toFixed(2) + 'x' : '(' + Math.abs(v).toFixed(2) + 'x)';
+const fmtX = v => v >= 0 ? v.toFixed(1) + 'x' : '(' + Math.abs(v).toFixed(1) + 'x)';
+const fmtP = (v, d = 1) => v >= 0 ? v.toFixed(d) + '%' : '(' + Math.abs(v).toFixed(d) + '%)';
+const fmtDays = v => v >= 0 ? v.toFixed(0) + 'd' : '(' + Math.abs(v).toFixed(0) + 'd)';
+function el(tag, attrs, parent) {
+  const svgT = ['svg','g','rect','line','path','circle','text'];
+  const n = svgT.includes(tag) ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
+  for (const k in attrs) { if (k === 'text') n.textContent = attrs[k]; else n.setAttribute(k, attrs[k]); }
+  if (parent) parent.appendChild(n);
+  return n;
+}
+const cssVar = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+const tt = $('tt');
+function showTT(x, y, title, rows) {
+  tt.textContent = '';
+  el('div', { 'class':'tt-title', text: title }, tt);
+  rows.forEach(r => {
+    const row = el('div', { 'class':'tt-row' }, tt);
+    const k = el('span', { 'class':'tt-key' }, row); k.style.background = r.color || 'transparent';
+    el('span', { 'class':'tt-val', text: r.val }, row);
+    el('span', { 'class':'tt-name', text: r.name || '' }, row);
+  });
+  tt.style.display = 'block';
+  const w = tt.offsetWidth, h = tt.offsetHeight;
+  tt.style.left = Math.min(x + 14, window.innerWidth - w - 8) + 'px';
+  tt.style.top = Math.max(8, y - h - 12) + 'px';
+}
+const hideTT = () => tt.style.display = 'none';
+
+/* ---------- inputs ---------- */
+[['iG', v => S.g1 = v/100, v => v.toFixed(1)+'%'],
+ ['iX', v => S.X = v, v => v.toFixed(0)],
+ ['iGT', v => S.gT = v/100, v => v.toFixed(2)+'%'],
+ ['iM', v => S.m = v/100, v => v.toFixed(1)+'%'],
+ ['iCV', v => S.conv = v/100, v => v.toFixed(0)+'%'],
+ ['iW', v => S.w = v/100, v => v.toFixed(2)+'%'],
+ ['iT', v => S.tax = v/100, v => v.toFixed(0)+'%'],
+ ['iD', v => S.days = v, v => fmtDays(v)],
+ ['iDT', v => S.daysT = v, v => fmtDays(v)],
+ ['iFI', v => S.fir = v/100, v => v.toFixed(2)+'%'],
+ ['iC', v => S.capex = v/100, v => v.toFixed(1)+'%'],
+ ['iDelta', v => S.delta = v/100, v => v.toFixed(0)+'%'],
+ ['iS', v => S.sbc = v/100, v => v.toFixed(1)+'%'],
+
+ ['iMK', v => S.mkt = v, v => v.toFixed(1)+'x']
+].forEach(([id, set, fmt]) => {
+  $(id).addEventListener('input', () => { const v = +$(id).value; set(v); $(id+'o').textContent = fmt(v); recalc(); });
+});
+['bNTM', 'bLTM'].forEach(id => {
+  $(id).addEventListener('click', () => {
+    S.basis = id === 'bLTM' ? 'LTM' : 'NTM';
+    $('bNTM').classList.toggle('active', S.basis === 'NTM');
+    $('bLTM').classList.toggle('active', S.basis === 'LTM');
+    $('basisToggle').classList.toggle('ltm', S.basis === 'LTM');
+    $('bNote').textContent = S.basis === 'LTM' ? '= NTM × (1+g₁)' : 'forward';
+    recalc();
+  });
+});
+
+/* ---------- peer benchmark (median method, live by ticker) ---------- */
+const COMPS = [
+  { name:'HUL',           sym:'HINDUNILVR.NS', mult: 31.6, days: -23, capex: 2.5, da: 2.0 },
+  { name:'Nestle India',  sym:'NESTLEIND.NS',  mult: 50.8, days: -24, capex: 4.0, da: 2.9 },
+  { name:'Marico',        sym:'MARICO.NS',     mult: 45.2, days: -18, capex: 2.0, da: 1.4 },
+  { name:'Dabur',         sym:'DABUR.NS',      mult: 29.2, days: -42, capex: 3.1, da: 3.5 },
+  { name:'Emami',         sym:'EMAMILTD.NS',   mult: 18.2, days:   8, capex: 2.0, da: 4.5 },
+];
+const API_BASE = location.protocol.startsWith('http') && location.hostname !== 'localhost'
+  ? '' : 'https://valuation-toolkit.higgsfield.app';
+async function fetchPeer(sym) {
+  const res = await fetch(API_BASE + '/api/peer?symbol=' + encodeURIComponent(sym));
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'lookup failed');
+  return data;
+}
+function applyPeer(c, d) {
+  c.name = d.name || d.symbol; c.sym = d.symbol;
+  if (d.mult != null) c.mult = d.mult;
+  if (d.days != null) c.days = d.days;
+  if (d.capex != null) c.capex = d.capex;
+  if (d.da != null) c.da = d.da;
+  c.live = new Date(d.asOf && d.asOf.price ? d.asOf.price : Date.now());
+}
+function liveNote(msg, isErr) {
+  const n = $('liveNote');
+  n.textContent = msg;
+  n.style.color = isErr ? 'var(--bad)' : 'var(--ink-muted)';
+}
+function median(arr) {
+  const a = arr.filter(x => x != null && isFinite(x)).sort((x, y) => x - y);
+  const n = a.length;
+  return n ? (n % 2 ? a[(n-1)/2] : (a[n/2-1] + a[n/2]) / 2) : NaN;
+}
+function buildCompsTable() {
+  const tbl = $('compsTable'); tbl.textContent = '';
+  const trh = el('tr', {}, el('thead', {}, tbl));
+  ['Peer','Mkt EV/EBITDA (' + S.basis + ')','WC days','Capex % rev','D&A % rev',''].forEach(h => el('th', { text:h }, trh));
+  const tb = el('tbody', {}, tbl);
+  const med = {
+    mult: median(COMPS.map(c => c.mult)),
+    days: median(COMPS.map(c => c.days)),
+    capex: median(COMPS.map(c => c.capex)),
+    da: median(COMPS.map(c => c.da)),
+  };
+  const rMed = engine(null, peerProf({ days: med.days, capex: med.capex, da: Math.min(med.da, med.capex) }));
+  COMPS.forEach((c, i) => {
+    const tr = el('tr', {}, tb);
+    // read-only, CapIQ-style: name + fetched metrics are outputs, not inputs
+    const tdName = el('td', {}, tr);
+    tdName.textContent = c.name;
+    tdName.style.cssText = 'font-weight:600';
+    tdName.title = c.sym ? c.sym + (c.live ? ' · live, fetched ' + c.live.toTimeString().slice(0,5) : ' · snapshot 12-Aug-2026') : 'manual row';
+    el('td', { text: c.mult != null ? fmtX(c.mult) : '—' }, tr);
+    el('td', { text: c.days != null ? fmtDays(c.days) : '—' }, tr);
+    el('td', { text: c.capex != null ? c.capex.toFixed(1) + '%' : '—' }, tr);
+    el('td', { text: c.da != null ? c.da.toFixed(1) + '%' : '—' }, tr);
+    const tdX = el('td', {}, tr);
+    if (COMPS.length > 2) {
+      const btn = el('button', { text:'×', title:'remove peer' }, tdX);
+      btn.style.cssText = 'font:inherit; font-size:12px; border:none; background:none; color:var(--ink-muted); cursor:pointer';
+      btn.addEventListener('click', () => { COMPS.splice(i, 1); recalcComps(); });
+    }
+  });
+  $('rBase').textContent = isNaN(med.mult) ? '—' :
+    fmtX(med.mult) + ' ' + S.basis + ' EV/EBITDA, ' + fmtDays(med.days) + ' working-capital days, capex ' + med.capex.toFixed(1) + '%, D&A ' + med.da.toFixed(1) + '%';
+  const B = bf();
+  const rDial = engine();
+  const gapEl = $('benchGap'); gapEl.textContent = '';
+  if (rDial.ok && rMed.ok && !isNaN(med.mult)) {
+    const kD = rDial.ok ? fairAdj(rDial).k : 1;
+    const gWC = (rDial.wc - rMed.wc) * B, gCX = (rDial.cx - rMed.cx) * B, gSB = (rDial.sb * kD - rMed.sb) * B;
+    const gap = gWC + gCX + gSB;
+    const fair = med.mult + gap;
+    const l1 = el('div', {}, gapEl);
+    l1.append('Capital-quality differential vs the median peer: ');
+    el('b', { text: fmtT(gap) + ' turns' }, l1);
+    l1.append('   working capital ' + fmtT(gWC) + ' (' + fmtDays(S.days) + ' vs ' + fmtDays(med.days) + '); capex ' + fmtT(gCX) + ' (' + (S.capex*100).toFixed(1) + '% vs ' + med.capex.toFixed(1) + '%); SBC ' + fmtT(gSB));
+    const l2 = el('div', {}, gapEl);
+    l2.append('Fair-relative multiple = median ' + fmtX(med.mult) + ' + gap ' + fmtT(gap) + ' = ');
+    const b2 = el('b', { text: fmtX(fair) + ' ' + S.basis + ' EV/EBITDA' }, l2);
+    b2.style.fontSize = '13px';
+  } else gapEl.textContent = '—';
+}
+function recalcComps() { buildCompsTable(); }
+async function addPeer() {
+  const sym = $('cpSym').value.trim();
+  if (!sym) { liveNote('Enter a ticker to add a peer.', true); return; }
+  const btn = $('addComp');
+  btn.disabled = true; btn.textContent = 'Fetching…';
+  liveNote('Retrieving ' + sym.toUpperCase() + '…');
+  try {
+    const d = await fetchPeer(sym);
+    const c = {};
+    applyPeer(c, d);
+    COMPS.push(c);
+    $('cpSym').value = '';
+    const t = c.live.toTimeString().slice(0, 5);
+    liveNote(d.name + ': ' + fmtX(d.mult) + ' EV/EBITDA, ' + fmtDays(d.days ?? 0) + ' working-capital days, capex ' + (d.capex ?? '—') + '%, D&A ' + (d.da ?? '—') + '%. Source ' + (d.source || '—') + ', retrieved ' + t + '.');
+    recalcComps();
+  } catch (e) {
+    liveNote(sym.toUpperCase() + ' could not be retrieved (' + e.message + '). Verify the ticker.', true);
+  }
+  btn.disabled = false; btn.textContent = '+ Add peer';
+}
+
+/* ---------- reconciliation ---------- */
+
+/* ---------- bridge ---------- */
+function drawBridge(r, B, adj) {
+  const host = $('chartBridge'); host.textContent = '';
+  if (!r.ok) return;
+  const steps = [
+    { name: 'Operating multiple', v: r.op * B, col: cssVar('--ink-1'), abs: true },
+    { name: 'Working capital', v: r.wc * B, col: cssVar('--series-1') },
+    { name: 'Capex', v: r.cx * B, col: cssVar('--series-2') },
+    { name: 'SBC', v: adj.sbB, col: cssVar('--series-5') },
+  ];
+  const fair = adj.fairB;
+  const W = 1080, H = 220, ML = 50, MR = 20, MT = 26, MB = 26;
+  const pw = W - ML - MR, ph = H - MT - MB;
+  const cums = [0];
+  steps.forEach(s => cums.push(cums[cums.length-1] + s.v));
+  let lo = Math.min(0, ...cums, S.mkt), hi = Math.max(0, ...cums, S.mkt);
+  const pad = (hi - lo) * 0.12 || 0.5; lo -= pad * 0.3; hi += pad;
+  const y = v => MT + (hi - v) / (hi - lo) * ph;
+  const n = steps.length + 1, band = pw / n, barW = Math.min(90, band - 40);
+  const svg = el('svg', { viewBox:`0 0 ${W} ${H}`, width:W, height:H, role:'img' });
+  el('line', { x1: ML, x2: W - MR, y1: y(0), y2: y(0), stroke: cssVar('--baseline'), 'stroke-width': 1 }, svg);
+  el('text', { x: ML - 8, y: y(0) + 3.5, 'text-anchor':'end', 'font-size': 10, fill: cssVar('--ink-muted'), text: '0' }, svg);
+  el('line', { x1: ML, x2: W - MR, y1: y(S.mkt), y2: y(S.mkt), stroke: cssVar('--ink-muted'), 'stroke-width': 1, 'stroke-dasharray': '5,4' }, svg);
+  el('text', { x: W - MR - 4, y: y(S.mkt) - 5, 'text-anchor':'end', 'font-size': 10.5, fill: cssVar('--ink-muted'), text: 'market ' + fmtX(S.mkt) }, svg);
+  steps.forEach((s, i) => {
+    const x0 = ML + band * i + (band - barW)/2;
+    const a = cums[i], b2 = cums[i+1];
+    const top = y(Math.max(a, b2)), hgt = Math.max(1.5, Math.abs(y(a) - y(b2)));
+    const rect = el('rect', { x: x0, y: top, width: barW, height: hgt, fill: s.col }, svg);
+    el('line', { x1: x0 + barW, x2: ML + band * (i+1) + (band - barW)/2, y1: y(b2), y2: y(b2), stroke: cssVar('--grid'), 'stroke-width': 1 }, svg);
+    el('text', { x: x0 + barW/2, y: top - 6, 'text-anchor':'middle', 'font-size': 11.5, 'font-weight': 600, fill: cssVar('--ink-1'),
+      text: s.abs ? fmtX(s.v) : fmtT(s.v) }, svg);
+    el('text', { x: x0 + barW/2, y: H - 8, 'text-anchor':'middle', 'font-size': 11, fill: cssVar('--ink-2'), text: s.name }, svg);
+    const hit = el('rect', { x: ML + band*i, y: MT, width: band, height: ph, fill: 'transparent' }, svg);
+    hit.addEventListener('pointermove', e => {
+      rect.style.filter = 'brightness(1.12)';
+      showTT(e.clientX, e.clientY, s.name, [{ color: s.col, val: (s.abs ? fmtX(s.v) : fmtT(s.v)) + (s.abs ? '' : ' turns'), name: '' }]);
+    });
+    hit.addEventListener('pointerleave', () => { rect.style.filter = ''; hideTT(); });
+  });
+  const xT = ML + band * steps.length + (band - barW)/2;
+  const topT = y(Math.max(0, fair)), hgtT = Math.max(1.5, Math.abs(y(0) - y(fair)));
+  el('rect', { x: xT, y: topT, width: barW, height: hgtT, fill: 'none', stroke: cssVar('--ink-1'), 'stroke-width': 1.5 }, svg);
+  el('text', { x: xT + barW/2, y: topT - 6, 'text-anchor':'middle', 'font-size': 11.5, 'font-weight': 600, fill: cssVar('--ink-1'), text: fmtX(fair) }, svg);
+  el('text', { x: xT + barW/2, y: H - 8, 'text-anchor':'middle', 'font-size': 11, 'font-weight': 600, fill: cssVar('--ink-1'), text: 'Fair multiple' }, svg);
+  host.appendChild(svg);
+  $('bridgeSub').textContent = S.basis + ' EV/EBITDA turns. Required return ' + (S.w*100).toFixed(2) + '%; revenue growth ' + (S.g1*100).toFixed(1) + '% for ' + S.X + ' years, then ' + (S.gT*100).toFixed(1) + '%; margin ' + (S.m*100).toFixed(1) + '%. Dashed line: traded multiple of ' + fmtX(S.mkt) + '.';
+}
+
+/* ---------- fragility ---------- */
+
+/* ---------- iso-multiple map ---------- */
+const AXES = {
+  w:  { label: 'Required return',    min: 6, max: 30,  toS: v => S.w = v/100,  of: () => S.w*100,  fmt: v => v.toFixed(0) + '%' },
+  X:  { label: 'High-growth years',  min: 1, max: 30,  toS: v => S.X = Math.max(1, Math.round(v)), of: () => S.X, fmt: v => v.toFixed(0) },
+  g1: { label: 'Revenue CAGR',       min: 0, max: 40,  toS: v => S.g1 = v/100, of: () => S.g1*100, fmt: v => v.toFixed(0) + '%' },
+  gT: { label: 'Terminal growth',    min: 0, max: 8,   toS: v => S.gT = v/100, of: () => S.gT*100, fmt: v => v.toFixed(1) + '%' },
+  m:  { label: 'EBITDA margin',      min: 3, max: 60,  toS: v => S.m = v/100,  of: () => S.m*100,  fmt: v => v.toFixed(0) + '%' },
+};
+S.mapX = 'w'; S.mapY = 'X';
+function evalFair(ax, vx, ay, vy) {
+  const saved = { g1: S.g1, X: S.X, gT: S.gT, m: S.m, w: S.w };
+  AXES[ax].toS(vx); AXES[ay].toS(vy);
+  const r = engine();
+  const v = r.ok ? fairAdj(r).fairB : NaN;
+  Object.assign(S, saved);
+  return v;
+}
+function drawMap() {
+  const host = $('chartMap'); host.textContent = '';
+  const ax = S.mapX, ay = S.mapY;
+  const A = AXES[ax], Bx = AXES[ay];
+  $('mapSub').textContent = 'Combinations of ' + A.label.toLowerCase() + ' and ' + Bx.label.toLowerCase() + ' at which the fair multiple equals the traded multiple of ' + fmtX(S.mkt) + '. Marker: current inputs.';
+  const W = 1080, H = 340, ML = 62, MR = 24, MT = 16, MB = 40;
+  const pw = W - ML - MR, ph = H - MT - MB;
+  const xp = v => ML + (v - A.min) / (A.max - A.min) * pw;
+  const yp = v => MT + (Bx.max - v) / (Bx.max - Bx.min) * ph;
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img' });
+  // grid + ticks
+  niceTicksMap(A.min, A.max, 8).forEach(v => {
+    el('line', { x1: xp(v), x2: xp(v), y1: MT, y2: MT + ph, stroke: cssVar('--grid'), 'stroke-width': 1 }, svg);
+    el('text', { x: xp(v), y: H - 22, 'text-anchor': 'middle', 'font-size': 10.5, fill: cssVar('--ink-muted'), text: A.fmt(v) }, svg);
+  });
+  niceTicksMap(Bx.min, Bx.max, 6).forEach(v => {
+    el('line', { x1: ML, x2: ML + pw, y1: yp(v), y2: yp(v), stroke: cssVar('--grid'), 'stroke-width': 1 }, svg);
+    el('text', { x: ML - 7, y: yp(v) + 3.5, 'text-anchor': 'end', 'font-size': 10.5, fill: cssVar('--ink-muted'), text: Bx.fmt(v) }, svg);
+  });
+  el('text', { x: ML + pw/2, y: H - 6, 'text-anchor': 'middle', 'font-size': 11, fill: cssVar('--ink-2'), text: A.label }, svg);
+  // solve the iso-line: for each x column, bisect y for fair = market
+  const N = 44, pts = [];
+  for (let i = 0; i <= N; i++) {
+    const vx = A.min + (A.max - A.min) * i / N;
+    let lo = Bx.min, hi = Bx.max;
+    let fLo = evalFair(ax, vx, ay, lo) - S.mkt, fHi = evalFair(ax, vx, ay, hi) - S.mkt;
+    if (isNaN(fLo) && isNaN(fHi)) continue;
+    if (isNaN(fLo)) { // shrink from below (e.g. gT >= w region)
+      for (let s = 0; s < 12 && isNaN(fLo); s++) { lo += (hi - lo) * 0.15; fLo = evalFair(ax, vx, ay, lo) - S.mkt; }
+    }
+    if (isNaN(fHi)) {
+      for (let s = 0; s < 12 && isNaN(fHi); s++) { hi -= (hi - lo) * 0.15; fHi = evalFair(ax, vx, ay, hi) - S.mkt; }
+    }
+    if (isNaN(fLo) || isNaN(fHi) || fLo * fHi > 0) continue;
+    for (let it = 0; it < 28; it++) {
+      const mid = (lo + hi) / 2, fm = evalFair(ax, vx, ay, mid) - S.mkt;
+      if (isNaN(fm)) break;
+      if (fm * fLo <= 0) hi = mid; else { lo = mid; fLo = fm; }
+    }
+    pts.push([vx, (lo + hi) / 2]);
+  }
+  if (pts.length > 1) {
+    const d = pts.map((p, i) => (i ? 'L' : 'M') + xp(p[0]).toFixed(1) + ',' + yp(p[1]).toFixed(1)).join('');
+    el('path', { d, fill: 'none', stroke: cssVar('--ink-1'), 'stroke-width': 2, 'stroke-linejoin': 'round' }, svg);
+  } else {
+    el('text', { x: ML + pw/2, y: MT + ph/2, 'text-anchor': 'middle', 'font-size': 12, fill: cssVar('--ink-muted'),
+      text: 'no line — see note below' }, svg);
+  }
+  // side labels: which side of the line is rich vs cheap
+  if (pts.length > 1) {
+    const cLo = evalFair(ax, (A.min + A.max)/2, ay, Bx.min + (Bx.max - Bx.min)*0.06);
+    if (!isNaN(cLo)) {
+      const lowIsCheap = cLo >= S.mkt;
+      el('text', { x: ML + 10, y: MT + 14, 'text-anchor': 'start', 'font-size': 10.5, fill: cssVar('--ink-muted'),
+        text: lowIsCheap ? 'above: fair below traded' : 'above: fair above traded' }, svg);
+      el('text', { x: ML + 10, y: MT + ph - 8, 'text-anchor': 'start', 'font-size': 10.5, fill: cssVar('--ink-muted'),
+        text: lowIsCheap ? 'below: fair above traded' : 'below: fair below traded' }, svg);
+    }
+  }
+  // current settings point
+  const cx = A.of(), cy = Bx.of();
+  if (cx >= A.min && cx <= A.max && cy >= Bx.min && cy <= Bx.max) {
+    el('circle', { cx: xp(cx), cy: yp(cy), r: 5, fill: cssVar('--surface-1'), stroke: cssVar('--ink-1'), 'stroke-width': 2 }, svg);
+  }
+  // hover: nearest solved column
+  const hit = el('rect', { x: ML, y: MT, width: pw, height: ph, fill: 'transparent' }, svg);
+  hit.addEventListener('pointermove', e => {
+    if (!pts.length) return;
+    const box = svg.getBoundingClientRect();
+    const sx = (e.clientX - box.left) / box.width * W;
+    let best = pts[0], bd = 1e9;
+    pts.forEach(p => { const d = Math.abs(xp(p[0]) - sx); if (d < bd) { bd = d; best = p; } });
+    showTT(e.clientX, e.clientY, 'justifies ' + fmtX(S.mkt), [
+      { color: 'transparent', val: A.fmt(best[0]), name: A.label },
+      { color: 'transparent', val: Bx.fmt(best[1]), name: Bx.label }]);
+  });
+  hit.addEventListener('pointerleave', hideTT);
+  host.appendChild(svg);
+  diagnoseMap(ax, ay, pts);
+}
+function diagnoseMap(ax, ay, pts) {
+  const A = AXES[ax], Bx = AXES[ay], d = $('mapDiag');
+  // coarse global scan for the reachable fair range and the best corner
+  let gmin = Infinity, gmax = -Infinity, bx = A.min, by = Bx.min, nan = 0;
+  for (let i = 0; i <= 10; i++) for (let j = 0; j <= 10; j++) {
+    const vx = A.min + (A.max - A.min) * i / 10, vy = Bx.min + (Bx.max - Bx.min) * j / 10;
+    const v = evalFair(ax, vx, ay, vy);
+    if (isNaN(v)) { nan++; continue; }
+    if (v > gmax) { gmax = v; bx = vx; by = vy; }
+    if (v < gmin) gmin = v;
+  }
+  const involves = k => ax === k || ay === k;
+  const spread = (nan > 0 && (involves('gT') || involves('w')))
+    ? ' Combinations in which terminal growth meets or exceeds the required return are excluded, the terminal value being undefined.' : '';
+  const reason = () => {
+    if (involves('X') && involves('w'))
+      return 'With the required return above the growth rate, additional years add little; the horizon cannot reach the traded multiple.';
+    if (involves('X'))
+      return 'The horizon’s contribution is bounded and cannot reach the traded multiple.';
+    if (involves('w'))
+      return 'The implied required return is below the range shown.';
+    return 'At the limits of both ranges the fair multiple does not reach the traded multiple.';
+  };
+  if (isFinite(gmax) && S.mkt > gmax + 1e-6) {
+    d.textContent = 'No combination of these assumptions reconciles to ' + fmtX(S.mkt) + '. At the most favourable point in range (' + A.label.toLowerCase() + ' ' + A.fmt(bx) + ', ' + Bx.label.toLowerCase() + ' ' + Bx.fmt(by) + '), the fair multiple reaches ' + fmtX(gmax) + '. ' + reason() + spread;
+    d.style.color = 'var(--bad)';
+    return;
+  }
+  if (isFinite(gmin) && S.mkt < gmin - 1e-6) {
+    d.textContent = 'Every combination exceeds ' + fmtX(S.mkt) + '; the fair multiple does not fall below ' + fmtX(gmin) + '.' + spread;
+    d.style.color = 'var(--ink-muted)';
+    return;
+  }
+  // a line exists — flag if the current settings sit in the unreachable band of this axis
+  if (pts.length > 1) {
+    const xs = pts.map(p => p[0]), xlo = Math.min(...xs), xhi = Math.max(...xs), cx = A.of();
+    if (cx < xlo - 1e-6 || cx > xhi + 1e-6) {
+      d.textContent = 'At the current ' + A.label.toLowerCase() + ' of ' + A.fmt(cx) + ', no ' + Bx.label.toLowerCase() + ' within range reconciles to the traded multiple; a solution exists only between ' + A.fmt(xlo) + ' and ' + A.fmt(xhi) + '. ' + reason() + spread;
+      d.style.color = 'var(--ink-2)';
+      return;
+    }
+  }
+  d.textContent = 'Each point on the curve reconciles the fair multiple to the traded multiple.' + spread;
+  d.style.color = 'var(--ink-muted)';
+}
+function niceTicksMap(lo, hi, n) {
+  const span = hi - lo || 1, step0 = span / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(x => x * mag).find(x => span / x <= n) || mag * 10;
+  const t = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) t.push(+v.toFixed(10));
+  return t;
+}
+function initMapSelects() {
+  ['mapX', 'mapY'].forEach(id => {
+    const sel = $(id);
+    Object.keys(AXES).forEach(k => {
+      const o = document.createElement('option');
+      o.value = k; o.textContent = AXES[k].label;
+      sel.appendChild(o);
+    });
+  });
+  $('mapX').value = S.mapX; $('mapY').value = S.mapY;
+  ['mapX', 'mapY'].forEach(id => {
+    $(id).addEventListener('change', () => {
+      const other = id === 'mapX' ? 'mapY' : 'mapX';
+      if ($(id).value === $(other).value) {
+        $(other).value = id === 'mapX' ? S.mapX : S.mapY;   // swap to avoid same axis twice
+      }
+      S.mapX = $('mapX').value; S.mapY = $('mapY').value;
+      drawMap();
+    });
+  });
+}
+initMapSelects();
+
+/* ---------- main ---------- */
+function recalc() {
+  const ok = S.w > S.gT + 0.002;
+  $('warnW').style.display = ok ? 'none' : 'block';
+  const da = daPct(), nfa = nfaPct();
+  $('rTurn').textContent = nfa > 0 ? (1/nfa).toFixed(1) + 'x' : '—';
+  $('rDA').textContent = (da*100).toFixed(2) + '% of revenue';
+  const r = ok ? engine() : { ok: false };
+  const B = bf();
+  if (!r.ok) {
+    ['tFair','tOp','tCap','tVs','tTM'].forEach(id => $(id).textContent = '—');
+    $('chartBridge').textContent = '';
+    return;
+  }
+  const adj = fairAdj(r);
+  const fair = adj.fairB, opB = r.op * B, capB = (r.wc + r.cx) * B + adj.sbB;
+  $('tFair').textContent = fmtX(fair);
+  $('tFairn').textContent = S.basis + ' EV/EBITDA; step 1 ' + fmtX(opB) + ' plus step 2 ' + fmtT(capB);
+  $('tOp').textContent = fmtX(opB);
+  $('tCap').textContent = fmtT(capB);
+  $('tCapn').textContent = 'working capital ' + fmtT(r.wc*B) + ', capex ' + fmtT(r.cx*B) + ', SBC ' + fmtT(adj.sbB) + (S.sbcMode === 'MKT' && S.sbc > 0 ? ' (' + (adj.k*100).toFixed(0) + '% of expense)' : '');
+  const gap = fair - S.mkt;
+  $('tVs').textContent = fmtT(gap);
+  $('tVsn').textContent = (gap >= 0 ? 'above' : 'below') + ' the traded multiple of ' + fmtX(S.mkt);
+  const tm = termMult();
+  $('tTM').textContent = isNaN(tm) ? '—' : fmtX(tm);
+  $('tTMn').textContent = 'steady state from year ' + S.X + '; terminal value ' + fmtP(r.tvShare*100, 0) + ' of step-1 value';
+  drawBridge(r, B, adj);
+  drawMap();
+  recalcComps();
+}
+['sFAIR', 'sMKT'].forEach(id => {
+  $(id).addEventListener('click', () => {
+    S.sbcMode = id === 'sMKT' ? 'MKT' : 'FAIR';
+    $('sFAIR').classList.toggle('active', S.sbcMode === 'FAIR');
+    $('sMKT').classList.toggle('active', S.sbcMode === 'MKT');
+    $('sbcToggle').classList.toggle('right', S.sbcMode === 'MKT');
+    $('sbcNote').textContent = S.sbcMode === 'MKT' ? 'dilution at market price' : 'fair-value issuance';
+    recalc();
+  });
+});
+$('addComp').addEventListener('click', addPeer);
+$('cpSym').addEventListener('keydown', e => { if (e.key === 'Enter') addPeer(); });
+async function refreshPeers(auto) {
+  const withSym = COMPS.filter(c => c.sym);
+  if (!withSym.length) { if (!auto) liveNote('No peers to refresh.', true); return; }
+  const btn = $('refreshComps');
+  btn.disabled = true; btn.textContent = auto ? 'Loading…' : 'Refreshing…';
+  if (auto) liveNote('Retrieving data for ' + withSym.length + ' peers…');
+  const results = await Promise.allSettled(withSym.map(c => fetchPeer(c.sym).then(d => applyPeer(c, d)).then(() => recalcComps())));
+  const okN = results.filter(x => x.status === 'fulfilled').length;
+  const fail = withSym.filter((c, i) => results[i].status === 'rejected').map(c => c.sym);
+  if (okN > 0) {
+    liveNote(okN + ' of ' + withSym.length + ' peers retrieved at ' + new Date().toTimeString().slice(0, 5) + (fail.length ? '; not retrieved: ' + fail.join(', ') : '') + '.', fail.length > 0);
+  } else {
+    liveNote('Live data is currently unavailable' + (auto ? '; the table shows the most recent stored values. The live feed operates on the hosted tool.' : ': ' + fail.join(', ') + '.'), true);
+  }
+  btn.disabled = false; btn.textContent = '↻ Refresh';
+  recalcComps();
+}
+$('refreshComps').addEventListener('click', () => refreshPeers(false));
+// totally-live: pull fresh data for all seed peers on load (falls back to snapshot if the feed is unreachable)
+refreshPeers(true);
+
+/* ---------- info popovers ---------- */
+const INFO = {
+  overview: 'Fair multiple = operating multiple (step 1) + capital adjustment (step 2). Step 1 is the present value of the after-tax operating stream ÷ year-one EBITDA, before invested capital. Step 2 is the present value of the working-capital, capex, SBC and float-interest flows on the same basis.',
+  step1: 'Present value of after-tax, conversion-adjusted EBITDA over the forecast and its terminal value, divided by year-one EBITDA.',
+  step2: 'Present value of the change in working capital, growth and maintenance capex net of the depreciation tax shield, SBC and float interest, divided by year-one EBITDA. Capital inputs are the capex ratio and the depreciation rate; the asset base is derived.',
+  fair: 'Operating multiple plus capital adjustment, on a DCF basis.',
+  conv: 'Share of EBITDA converting to cash in steady state, applied to every year. Excludes working capital (step 2) and lease expense (above EBITDA).',
+  mkt: 'Traded EV/EBITDA. Used for the comparison, the bridge reference line and the implied-return calculation; does not enter the fair multiple.',
+  termmult: 'Fair EV/EBITDA in steady state, from year X: terminal growth, terminal working-capital days, normalised capex, unchanged margin, discounted at the required return. LTM converts by (1 + terminal growth); SBC charged at fair value.',
+  bridge: 'Left bar: operating multiple (step 1). Middle bars: capital adjustments (step 2). Outlined bar: fair multiple. Dashed line: traded multiple.',
+  isomap: 'For the two selected assumptions, the curve is the set of combinations at which the fair multiple equals the traded multiple, all other inputs held constant. Marker: current inputs.',
+  basis: 'Forward (NTM) basis; LTM converts by (1 + revenue growth) at constant margin. Match the traded multiple’s basis.',
+  sbcmode: 'FAIR: SBC at accounting expense (equity issued at fair value). MKT: SBC as dilution at the traded price — annual transfer = expense × fair ÷ market — so fair = base ÷ (1 − SBC turns ÷ traded multiple); the traded multiple then affects the fair multiple. The step-2 tile shows the effective charge as a % of the expense.',
+  comps: 'Fair-relative multiple = peer-median EV/EBITDA + the capital-quality differential vs the median peer, on the step-2 basis. Both evaluated under the same growth and margin assumptions. India from Screener (consolidated), US from Yahoo; EV gross of cash.',
+  recon: 'Every number in the fair multiple, year by year: the operating stream and each capital flow, discounted and summed. The final row reproduces the hero tile on an NTM basis.',
+  reqret: 'Discount rate applied to all cash flows. Keep consistent with the currency of the cash flows.',
+  g1: 'Revenue growth over the forecast horizon.',
+  xyears: 'Years of stage-one growth before reverting to the terminal rate.',
+  gterm: 'Perpetual growth rate beyond the forecast. Must be below the required return.',
+  margin: 'Steady-state EBITDA margin.',
+};
+const pop = document.createElement('div');
+pop.className = 'popover';
+document.body.appendChild(pop);
+let popFor = null;
+document.querySelectorAll('.info').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (popFor === btn) { pop.style.display = 'none'; popFor = null; return; }
+    pop.textContent = INFO[btn.dataset.info] || '';
+    pop.style.display = 'block';
+    const r = btn.getBoundingClientRect();
+    const pw = Math.min(380, window.innerWidth - 24);
+    pop.style.maxWidth = pw + 'px';
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 12));
+    const below = r.bottom + 8 + pop.offsetHeight < window.innerHeight;
+    pop.style.left = left + 'px';
+    pop.style.top = (below ? r.bottom + 8 : Math.max(8, r.top - pop.offsetHeight - 8)) + 'px';
+    popFor = btn;
+  });
+});
+document.addEventListener('click', () => { pop.style.display = 'none'; popFor = null; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { pop.style.display = 'none'; popFor = null; } });
+
+recalc();
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', recalc);
+</script>
+</body>
+</html>
