@@ -584,14 +584,16 @@ function drawBridge(r, B, adj) {
 /* ---------- fragility ---------- */
 
 /* ---------- iso-multiple map ---------- */
+// Only the levers that move the fair multiple strongly and smoothly belong here:
+// required return, terminal growth, near-term revenue CAGR. EBITDA margin barely
+// moves the multiple (it scales EBITDA and EV together) and high-growth years saturates,
+// so both yield degenerate "no line" or hockey-stick curves — excluded as map axes.
 const AXES = {
   w:  { label: 'Required return',    min: 6, max: 30,  toS: v => S.w = v/100,  of: () => S.w*100,  fmt: v => v.toFixed(0) + '%' },
-  X:  { label: 'High-growth years',  min: 1, max: 30,  toS: v => S.X = Math.max(1, Math.round(v)), of: () => S.X, fmt: v => v.toFixed(0) },
-  g1: { label: 'Revenue CAGR',       min: 0, max: 40,  toS: v => S.g1 = v/100, of: () => S.g1*100, fmt: v => v.toFixed(0) + '%' },
   gT: { label: 'Terminal growth',    min: 0, max: 8,   toS: v => S.gT = v/100, of: () => S.gT*100, fmt: v => v.toFixed(1) + '%' },
-  m:  { label: 'EBITDA margin',      min: 3, max: 60,  toS: v => S.m = v/100,  of: () => S.m*100,  fmt: v => v.toFixed(0) + '%' },
+  g1: { label: 'Revenue CAGR',       min: 0, max: 40,  toS: v => S.g1 = v/100, of: () => S.g1*100, fmt: v => v.toFixed(0) + '%' },
 };
-S.mapX = 'w'; S.mapY = 'X';
+S.mapX = 'w'; S.mapY = 'gT';
 function evalFair(ax, vx, ay, vy) {
   const saved = { g1: S.g1, X: S.X, gT: S.gT, m: S.m, w: S.w };
   AXES[ax].toS(vx); AXES[ay].toS(vy);
