@@ -119,9 +119,10 @@
   <div class="panel">
     <h2>Business &amp; Required Return</h2>
     <div class="prm"><label for="iG">Revenue CAGR — Next X Years<button class="info" data-info="g1">i</button></label><input type="range" id="iG" min="0" max="40" step="0.5" value="10"><output id="iGo">10.0%</output></div>
-    <div class="prm"><label for="iX">High-Growth Years<button class="info" data-info="xyears">i</button></label><input type="range" id="iX" min="1" max="30" step="1" value="10"><output id="iXo">10</output></div>
+    <div class="prm"><label for="iX">Years to Steady-State<button class="info" data-info="xyears">i</button></label><input type="range" id="iX" min="1" max="30" step="1" value="10"><output id="iXo">10</output></div>
     <div class="prm"><label for="iGT">Terminal Growth<button class="info" data-info="gterm">i</button></label><input type="range" id="iGT" min="0" max="8" step="0.25" value="3"><output id="iGTo">3.00%</output></div>
-    <div class="prm"><label for="iM">EBITDA Margin<button class="info" data-info="margin">i</button></label><input type="range" id="iM" min="3" max="60" step="0.5" value="15"><output id="iMo">15.0%</output></div>
+    <div class="prm"><label for="iM">EBITDA Margin — Current<button class="info" data-info="margin">i</button></label><input type="range" id="iM" min="3" max="60" step="0.5" value="15"><output id="iMo">15.0%</output></div>
+    <div class="prm"><label for="iMT">EBITDA Margin — Terminal<button class="info" data-info="marginT">i</button></label><input type="range" id="iMT" min="3" max="60" step="0.5" value="15"><output id="iMTo">15.0%</output></div>
     <div class="prm"><label for="iCV">Cash Conversion of EBITDA<button class="info" data-info="conv">i</button></label><input type="range" id="iCV" min="50" max="110" step="1" value="100"><output id="iCVo">100%</output></div>
     <div class="prm" style="margin-top:10px"><label for="iW" style="font-weight:600; color:var(--ink-1)">Required Return<button class="info" data-info="reqret">i</button></label><input type="range" id="iW" min="6" max="30" step="0.25" value="15"><output id="iWo">15.00%</output></div>
     <div class="prm"><label for="iT">Tax Rate</label><input type="range" id="iT" min="0" max="40" step="1" value="25"><output id="iTo">25%</output></div>
@@ -132,7 +133,8 @@
     <div class="prm"><label for="iD">NWC Days — Current, Avg</label><input type="range" id="iD" min="-90" max="120" step="1" value="-30"><output id="iDo">(30d)</output></div>
     <div class="prm"><label for="iDT">NWC Days — Terminal</label><input type="range" id="iDT" min="-90" max="120" step="1" value="-30"><output id="iDTo">(30d)</output></div>
     <div class="prm"><label for="iFI">Float Interest Rate, p.a.</label><input type="range" id="iFI" min="0" max="10" step="0.25" value="0"><output id="iFIo">0.00%</output></div>
-    <div class="prm"><label for="iC">Capex, <em>% of Revenue</em></label><input type="range" id="iC" min="0" max="20" step="0.1" value="1.2"><output id="iCo">1.2%</output></div>
+    <div class="prm"><label for="iC">Capex — Current, <em>% of Revenue</em><button class="info" data-info="capex">i</button></label><input type="range" id="iC" min="0" max="20" step="0.1" value="1.2"><output id="iCo">1.2%</output></div>
+    <div class="prm"><label for="iCT">Capex — Terminal, <em>% of Revenue</em><button class="info" data-info="capexT">i</button></label><input type="range" id="iCT" min="0" max="20" step="0.1" value="1.2"><output id="iCTo">1.2%</output></div>
     <div class="prm"><label for="iDelta">D&amp;A Rate, <em>% of NFA</em></label><input type="range" id="iDelta" min="1" max="50" step="1" value="20"><output id="iDeltao">20%</output></div>
     <div class="prm"><label for="iS">SBC, <em>% of Revenue</em></label><input type="range" id="iS" min="0" max="12" step="0.1" value="0"><output id="iSo">0.0%</output></div>
     <div class="prm"><label>SBC Priced at<button class="info" data-info="sbcmode">i</button></label>
@@ -215,6 +217,7 @@
   <h2>Notes and Conventions</h2>
   <ul style="margin:2px 0 0 0; padding-left:18px; font-size:12px; color:var(--ink-2); line-height:1.6">
     <li>EBITDA is stated <b>post-rental</b> (rent/lease charged above EBITDA; pre-Ind-AS-116). It is not added back.</li>
+    <li>Transition: revenue growth, working-capital days, capex and EBITDA margin <b>ramp linearly from current to terminal over the years-to-steady-state horizon</b>, reaching steady state together. Terminal capex is the maintenance level; growth capex fades with growth on top of it.</li>
     <li>Working-capital days: <b>average balance, on sales</b> (average NWC ÷ revenue × 365), applied to the company and all peers.</li>
     <li>Float interest: earned on the <b>average annual float balance</b>, after tax, where working capital is negative.</li>
     <li>Asset turnover and the D&amp;A rate: on the <b>average net-fixed-asset base</b> (opening and closing).</li>
@@ -229,16 +232,18 @@
 'use strict';
 /* ---------- state (single input set) ---------- */
 const S = {
-  g1: 0.10, X: 10, gT: 0.03, m: 0.15, conv: 1.00, tax: 0.25, basis: 'LTM',
+  g1: 0.10, X: 10, gT: 0.03, m: 0.15, mT: 0.15, conv: 1.00, tax: 0.25, basis: 'LTM',
   w: 0.15,   // required return — stated directly, no CAPM build-up
-  days: -30, daysT: -30, capex: 0.012, delta: 0.20, sbc: 0, fir: 0,
+  days: -30, daysT: -30, capex: 0.012, capexT: 0.012, delta: 0.20, sbc: 0, fir: 0,
   mkt: 25, sbcMode: 'MKT',   // SBC priced as dilution at market price by default
 };
 /* derived capital identities (same as the Capital-Efficiency tool) */
 /* average-NFA conventions: D&A rate is on the AVERAGE net-fixed-asset base held through the year,
    and asset turnover uses average NFA — consistent with the average-balance basis used for working capital. */
-const avgNfaPct = () => S.capex * (2 + S.g1) / (2 * S.g1 + S.delta * (2 + S.g1));
-const daPct = () => S.delta * avgNfaPct();
+const avgNfaPctOf = c => c * (2 + S.g1) / (2 * S.g1 + S.delta * (2 + S.g1));
+const avgNfaPct = () => avgNfaPctOf(S.capex);
+const daPct = () => S.delta * avgNfaPct();               // current maintenance / D&A rate on revenue
+const daPctT = () => S.delta * avgNfaPctOf(S.capexT);    // terminal (steady-state) maintenance rate
 const nfaPct = () => avgNfaPct();
 
 /* ---------- engine: one pass, both steps ----------
@@ -246,47 +251,51 @@ const nfaPct = () => avgNfaPct();
    prof overrides the capital profile (peer rows); default is the dial company. */
 function dialProf() {
   const da = daPct();
-  return { days: S.days, daysT: S.daysT, da,
+  return { days: S.days, daysT: S.daysT, da, daT: daPctT(),
     f: S.g1 > 0.001 ? (S.capex - da) * (1 + S.g1) / S.g1 : 0, sbc: S.sbc };
 }
 function peerProf(c) {
   const da = c.da / 100;
-  return { days: c.days, daysT: c.days, da,
+  return { days: c.days, daysT: c.days, da, daT: da,
     f: S.g1 > 0.001 ? Math.max(0, c.capex/100 - da) * (1 + S.g1) / S.g1 : 0, sbc: 0 };
 }
 function engine(wOv, prof) {
   const w = wOv ?? S.w;
   if (w <= S.gT + 0.002) return { ok: false };
   const p = prof ?? dialProf();
-  const da = p.da, f = p.f, sbc = p.sbc;
-  /* single terminal regime: WC days reach terminal exactly when growth does (year X) */
-  const d0 = p.days, dT = p.daysT, nY = S.X;
+  const da0 = p.da, daT = p.daT, f = p.f, sbc = p.sbc;
+  /* single terminal regime: growth, WC days, capex (maintenance) and margin all reach
+     terminal at the shared "years to steady-state" horizon (S.X). */
+  const d0 = p.days, dT = p.daysT, nY = Math.max(S.X, 1);
   const H1 = Math.max(S.X, 1) + 1;
-  const dAt = t => t >= nY ? dT : d0 + (dT - d0) * t / nY;
+  const ramp = (a, b, t) => t >= nY ? b : a + (b - a) * t / nY;
+  const dAt = t => ramp(d0, dT, t);
+  const mAt = t => ramp(S.m, S.mT, t);        // EBITDA margin ramps current → terminal
+  const daAt = t => ramp(da0, daT, t);        // maintenance / D&A rate ramps current → terminal
   const kd = (g, d) => (d/365) * 2 * (1 + g) / (2 + g);
   const rev = [1], gs = [S.g1];
   for (let t = 1; t <= H1; t++) { const g = t <= S.X ? S.g1 : S.gT; gs.push(g); rev.push(rev[t-1]*(1+g)); }
-  const e1 = S.m * rev[1];
+  const e1 = mAt(1) * rev[1];
   let op = 0, wc = 0, fx = 0, mt = 0, sb = 0, fi = 0, Bprev = kd(S.g1, d0) * rev[0];
   const rows = [];
   for (let t = 1; t <= H1; t++) {
     const d = Math.pow(1 + w, t), dr = rev[t] - rev[t-1], dc = dAt(t);
     const B = kd(gs[t], dc) * rev[t];
-    const vOp = (1 - S.tax) * S.conv * S.m * rev[t],
+    const vOp = (1 - S.tax) * S.conv * mAt(t) * rev[t],
           vWC = B - Bprev, vFX = f * dr,
-          vMT = (1 - S.tax) * da * rev[t], vSB = sbc * rev[t],
+          vMT = (1 - S.tax) * daAt(t) * rev[t], vSB = sbc * rev[t],
           vFI = (dc < 0 && S.fir > 0) ? (1 - S.tax) * S.fir * (-dc/365) * rev[t] : 0;
     op += vOp / d; wc += vWC / d; Bprev = B;
     fx += vFX / d; mt += vMT / d; sb += vSB / d; fi += vFI / d;
     const flow = vOp - vWC - vFX - vMT - vSB + vFI;
-    rows.push({ t, g: gs[t], rev: rev[t], ebitda: S.m * rev[t], opF: vOp, B,
+    rows.push({ t, g: gs[t], rev: rev[t], ebitda: mAt(t) * rev[t], opF: vOp, B,
       dNWC: -vWC, gc: -vFX, mnt: -vMT, sbF: -vSB, fiF: vFI, flow, df: 1/d, pv: flow / d });
   }
   const dH = Math.pow(1 + w, H1), gp = w - S.gT, gr = rev[H1] * (1 + S.gT) / gp / dH;
-  const tvOp = (1 - S.tax) * S.conv * S.m * gr;
+  const tvOp = (1 - S.tax) * S.conv * S.mT * gr;
   const tvWC = kd(S.gT, dT) * rev[H1] * S.gT / gp / dH,
         tvFX = f * rev[H1] * S.gT / gp / dH,
-        tvMT = (1 - S.tax) * da * gr,
+        tvMT = (1 - S.tax) * daT * gr,
         tvSB = sbc * gr,
         tvFI = (dT < 0 && S.fir > 0) ? (1 - S.tax) * S.fir * (-dT/365) * gr : 0;
   op += tvOp; wc += tvWC; fx += tvFX; mt += tvMT; sb += tvSB; fi += tvFI;
@@ -302,15 +311,15 @@ const bf = () => S.basis === 'LTM' ? 1 + S.g1 : 1;
 function termMult() {
   const gp = S.w - S.gT;
   if (gp <= 0.002) return NaN;
-  const da = daPct(), f = dialProf().f;
+  const da = daPctT(), f = dialProf().f;           // terminal maintenance rate
   const kT = (S.daysT/365) * 2 * (1 + S.gT) / (2 + S.gT);
-  const perRev = (1 - S.tax) * S.conv * S.m       // operating
+  const perRev = (1 - S.tax) * S.conv * S.mT      // operating, at terminal margin
     - (1 - S.tax) * da                            // maintenance, net of shield
     - f * S.gT / (1 + S.gT)                       // growth capex at terminal growth
     - kT * S.gT / (1 + S.gT)                      // NWC change (credit when days < 0)
     - S.sbc                                       // SBC at fair value
     + ((S.daysT < 0 && S.fir > 0) ? (1 - S.tax) * S.fir * (-S.daysT/365) : 0);
-  const ntm = perRev / gp / S.m;                  // EV_X ÷ NTM EBITDA at X
+  const ntm = perRev / gp / S.mT;                 // EV_X ÷ NTM EBITDA at X (terminal margin)
   return S.basis === 'LTM' ? ntm * (1 + S.gT) : ntm;
 }
 /* SBC as dilution at MARKET price: value transferred to employees each year
@@ -362,6 +371,7 @@ const hideTT = () => tt.style.display = 'none';
  ['iX', v => S.X = v, v => v.toFixed(0)],
  ['iGT', v => S.gT = v/100, v => v.toFixed(2)+'%'],
  ['iM', v => S.m = v/100, v => v.toFixed(1)+'%'],
+ ['iMT', v => S.mT = v/100, v => v.toFixed(1)+'%'],
  ['iCV', v => S.conv = v/100, v => v.toFixed(0)+'%'],
  ['iW', v => S.w = v/100, v => v.toFixed(2)+'%'],
  ['iT', v => S.tax = v/100, v => v.toFixed(0)+'%'],
@@ -369,6 +379,7 @@ const hideTT = () => tt.style.display = 'none';
  ['iDT', v => S.daysT = v, v => fmtDays(v)],
  ['iFI', v => S.fir = v/100, v => v.toFixed(2)+'%'],
  ['iC', v => S.capex = v/100, v => v.toFixed(1)+'%'],
+ ['iCT', v => S.capexT = v/100, v => v.toFixed(1)+'%'],
  ['iDelta', v => S.delta = v/100, v => v.toFixed(0)+'%'],
  ['iS', v => S.sbc = v/100, v => v.toFixed(1)+'%'],
 
@@ -578,7 +589,7 @@ function drawBridge(r, B, adj) {
   el('text', { x: xT + barW/2, y: topT - 6, 'text-anchor':'middle', 'font-size': 11.5, 'font-weight': 600, fill: cssVar('--ink-1'), text: fmtX(fair) }, svg);
   el('text', { x: xT + barW/2, y: H - 8, 'text-anchor':'middle', 'font-size': 11, 'font-weight': 600, fill: cssVar('--ink-1'), text: 'Fair Multiple' }, svg);
   host.appendChild(svg);
-  $('bridgeSub').textContent = S.basis + ' EV/EBITDA turns. Required return ' + (S.w*100).toFixed(2) + '%; revenue growth ' + (S.g1*100).toFixed(1) + '% for ' + S.X + ' years, then ' + (S.gT*100).toFixed(1) + '%; margin ' + (S.m*100).toFixed(1) + '%. Dashed line: traded multiple of ' + fmtX(S.mkt) + '.';
+  $('bridgeSub').textContent = S.basis + ' EV/EBITDA turns. Required return ' + (S.w*100).toFixed(2) + '%; revenue growth ' + (S.g1*100).toFixed(1) + '% for ' + S.X + ' years, then ' + (S.gT*100).toFixed(1) + '%; margin ' + (S.m*100).toFixed(1) + '%' + (Math.abs(S.mT - S.m) > 1e-9 ? ' → ' + (S.mT*100).toFixed(1) + '%' : '') + '. Dashed line: traded multiple of ' + fmtX(S.mkt) + '.';
 }
 
 /* ---------- fragility ---------- */
@@ -834,7 +845,7 @@ const INFO = {
   fair: 'Operating multiple plus capital adjustment, on a DCF basis.',
   conv: 'Share of EBITDA converting to cash in steady state, applied to every year. Excludes working capital (step 2) and lease expense (above EBITDA).',
   mkt: 'Traded EV/EBITDA. Used for the comparison, the bridge reference line and the implied-return calculation; does not enter the fair multiple.',
-  termmult: 'Fair EV/EBITDA in steady state, from year X: terminal growth, terminal working-capital days, normalised capex, unchanged margin, discounted at the required return. LTM converts by (1 + terminal growth); SBC charged at fair value.',
+  termmult: 'Fair EV/EBITDA in steady state, from the steady-state year: terminal growth, terminal working-capital days, terminal capex and terminal margin, discounted at the required return. LTM converts by (1 + terminal growth); SBC charged at fair value.',
   bridge: 'Left bar: operating multiple (step 1). Middle bars: capital adjustments (step 2). Outlined bar: fair multiple. Dashed line: traded multiple.',
   isomap: 'For the two selected assumptions, the curve is the set of combinations at which the fair multiple equals the traded multiple, all other inputs held constant. Marker: current inputs.',
   basis: 'Forward (NTM) basis; LTM converts by (1 + revenue growth) at constant margin. Match the traded multiple’s basis.',
@@ -843,9 +854,12 @@ const INFO = {
   recon: 'Every number in the fair multiple, year by year: the operating stream and each capital flow, discounted and summed. The final row reproduces the hero tile on an NTM basis.',
   reqret: 'Discount rate applied to all cash flows. Keep consistent with the currency of the cash flows.',
   g1: 'Revenue growth over the forecast horizon.',
-  xyears: 'Years of stage-one growth before reverting to the terminal rate.',
+  xyears: 'Shared years-to-steady-state horizon. Revenue growth, working-capital days, capex and EBITDA margin all ramp linearly from their current to their terminal values over this window, reaching steady state together.',
   gterm: 'Perpetual growth rate beyond the forecast. Must be below the required return.',
-  margin: 'Steady-state EBITDA margin.',
+  margin: 'EBITDA margin today (year one). Ramps to the terminal margin over the years-to-steady-state horizon.',
+  marginT: 'Steady-state EBITDA margin, reached at the end of the years-to-steady-state horizon. Margin scales EBITDA and EV together, so it moves the fair multiple only through its effect on capital intensity per turn of EBITDA.',
+  capex: 'Total capex today as a share of revenue. Sets the current asset base and, with the D&A rate, the maintenance charge and the incremental growth-capital ratio.',
+  capexT: 'Terminal capex as a share of revenue — the steady-state maintenance level to which capex normalises over the years-to-steady-state horizon. Growth capex continues to fade with growth on top of this.',
 };
 const pop = document.createElement('div');
 pop.className = 'popover';
