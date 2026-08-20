@@ -67,19 +67,15 @@ async function fromScreener(code) {
     }
     capex = Math.abs(sum / k) / revLtm * 100;
   }
-  // growth metrics — last screener column is TTM; annual figures exclude it.
-  // 3y CAGR: latest full year vs the year three prior. LTM growth: TTM vs latest full year.
-  let rev3 = null, eb3 = null, revLtmG = null, ebLtmG = null;
-  if (sales && sales.length >= 2) {
-    const annR = sales.slice(0, -1);
-    if (annR.length >= 4) rev3 = cagrPct(annR[annR.length - 1], annR[annR.length - 4], 3);
-    if (annR.length >= 1) revLtmG = growPct(last(sales), annR[annR.length - 1]);
-  }
-  if (opProfit && opProfit.length >= 2) {
-    const annE = opProfit.slice(0, -1);
-    if (annE.length >= 4) eb3 = cagrPct(annE[annE.length - 1], annE[annE.length - 4], 3);
-    if (annE.length >= 1) ebLtmG = growPct(last(opProfit), annE[annE.length - 1]);
-  }
+  // growth — annual basis, consistent across sources. Screener's final P&L column is TTM when present; drop it.
+  const hasTTM = /<t[hd][^>]*>\s*TTM\s*<\/t[hd]>/i.test(pl);
+  const annSales = (hasTTM && sales && sales.length > 1) ? sales.slice(0, -1) : (sales || []);
+  const annOp = (hasTTM && opProfit && opProfit.length > 1) ? opProfit.slice(0, -1) : (opProfit || []);
+  const sN = annSales.length, oN = annOp.length;
+  const rev3 = sN >= 4 ? cagrPct(annSales[sN - 1], annSales[sN - 4], 3) : null;
+  const revLtmG = sN >= 2 ? growPct(annSales[sN - 1], annSales[sN - 2]) : null;
+  const eb3 = oN >= 4 ? cagrPct(annOp[oN - 1], annOp[oN - 4], 3) : null;
+  const ebLtmG = oN >= 2 ? growPct(annOp[oN - 1], annOp[oN - 2]) : null;
   return {
     symbol: code, name, currency: 'INR', source: 'screener.in (consolidated)',
     mult: round(mult, 1), days: days == null ? null : round(days, 0),
@@ -104,7 +100,7 @@ async function fromYahoo(symbol) {
   const cj = await cRes.json();
   const meta = (cj && cj.chart && cj.chart.result && cj.chart.result[0]) ? cj.chart.result[0].meta : null;
   if (!meta || typeof meta.regularMarketPrice !== 'number') throw new Error('yahoo: symbol not found');
-  const tRes = await fetch(YH + '/ws/fundamentals-timeseries/v1/finance/timeseries/' + encodeURIComponent(symbol) + '?type=' + YTYPES + '&period1=' + (now - 3600 * 24 * 1200) + '&period2=' + now, { headers: UA });
+  const tRes = await fetch(YH + '/ws/fundamentals-timeseries/v1/finance/timeseries/' + encodeURIComponent(symbol) + '?type=' + YTYPES + '&period1=' + (now - 3600 * 24 * 2400) + '&period2=' + now, { headers: UA });
   const ts = tRes.ok ? await tRes.json() : null;
   const lastRaw = a => a.length ? a[a.length - 1].raw : undefined;
   const shares = lastRaw(yseries(ts, 'annualOrdinarySharesNumber'));
@@ -123,14 +119,13 @@ async function fromYahoo(symbol) {
   const daRaw = lastRaw(yseries(ts, 'trailingReconciledDepreciation')) || lastRaw(yseries(ts, 'annualReconciledDepreciation'));
   const da = daRaw ? daRaw / rev * 100 : null;
   const caLast = ca.length ? ca[ca.length - 1] : null;
-  // growth metrics — 3y CAGR from annual series; LTM growth = trailing vs latest full year
+  // growth — annual basis, consistent across sources (avoids Yahoo's trailing-vs-lagged-annual distortion)
   const annRev = yseries(ts, 'annualTotalRevenue'), annEb = yseries(ts, 'annualEBITDA');
-  const trR = lastRaw(yseries(ts, 'trailingTotalRevenue')), trE = lastRaw(yseries(ts, 'trailingEBITDA'));
-  let rev3 = null, eb3 = null, revLtmG = null, ebLtmG = null;
-  if (annRev.length >= 4) rev3 = cagrPct(annRev[annRev.length - 1].raw, annRev[annRev.length - 4].raw, 3);
-  if (annRev.length >= 1 && trR != null) revLtmG = growPct(trR, annRev[annRev.length - 1].raw);
-  if (annEb.length >= 4) eb3 = cagrPct(annEb[annEb.length - 1].raw, annEb[annEb.length - 4].raw, 3);
-  if (annEb.length >= 1 && trE != null) ebLtmG = growPct(trE, annEb[annEb.length - 1].raw);
+  const rN = annRev.length, eN = annEb.length;
+  const rev3 = rN >= 4 ? cagrPct(annRev[rN - 1].raw, annRev[rN - 4].raw, 3) : null;
+  const revLtmG = rN >= 2 ? growPct(annRev[rN - 1].raw, annRev[rN - 2].raw) : null;
+  const eb3 = eN >= 4 ? cagrPct(annEb[eN - 1].raw, annEb[eN - 4].raw, 3) : null;
+  const ebLtmG = eN >= 2 ? growPct(annEb[eN - 1].raw, annEb[eN - 2].raw) : null;
   return {
     symbol, name: meta.shortName || meta.longName || symbol, currency: meta.currency, source: 'Yahoo Finance',
     mult: round(ev / ebitda, 1), days: days == null ? null : round(days, 0),
