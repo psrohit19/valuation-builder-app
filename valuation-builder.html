@@ -118,8 +118,8 @@
 <div class="toprow">
   <div class="panel">
     <h2>Business &amp; Required Return</h2>
-    <div class="prm"><label for="iG">Revenue CAGR — Next X Years<button class="info" data-info="g1">i</button></label><input type="range" id="iG" min="0" max="40" step="0.5" value="10"><output id="iGo">10.0%</output></div>
-    <div class="prm"><label for="iX">High-Growth Years<button class="info" data-info="xyears">i</button></label><input type="range" id="iX" min="1" max="30" step="1" value="10"><output id="iXo">10</output></div>
+    <div class="prm"><label for="iG">LTM Revenue Growth<button class="info" data-info="g1">i</button></label><input type="range" id="iG" min="0" max="40" step="0.5" value="10"><output id="iGo">10.0%</output></div>
+    <div class="prm"><label for="iX">Glide-Path Duration, <em>yrs to terminal</em><button class="info" data-info="xyears">i</button></label><input type="range" id="iX" min="1" max="30" step="1" value="10"><output id="iXo">10</output></div>
     <div class="prm"><label for="iGT">Terminal Growth<button class="info" data-info="gterm">i</button></label><input type="range" id="iGT" min="0" max="8" step="0.25" value="3"><output id="iGTo">3.00%</output></div>
     <div class="prm"><label for="iM">EBITDA Margin — Current<button class="info" data-info="margin">i</button></label><input type="range" id="iM" min="3" max="60" step="0.5" value="15"><output id="iMo">15.0%</output></div>
     <div class="prm"><label for="iMT">EBITDA Margin — Terminal<button class="info" data-info="marginT">i</button></label><input type="range" id="iMT" min="3" max="60" step="0.5" value="15"><output id="iMTo">15.0%</output></div>
@@ -220,7 +220,7 @@
   <h2>Notes and Conventions</h2>
   <ul style="margin:2px 0 0 0; padding-left:18px; font-size:12px; color:var(--ink-2); line-height:1.6">
     <li>EBITDA is stated <b>post-rental</b> (rent/lease charged above EBITDA; pre-Ind-AS-116). It is not added back.</li>
-    <li>Transition: revenue growth reverts over the <b>high-growth years</b>; EBITDA margin, capex and NWC days each ramp linearly from current to terminal over <b>their own years-to-steady-state</b> (set independently). Terminal capex is the maintenance level; growth capex fades with growth on top of it.</li>
+    <li>Transition: revenue growth <b>glides linearly from the LTM rate to terminal growth over the glide-path duration</b>; EBITDA margin, capex and NWC days each ramp from current to terminal over <b>their own years-to-steady-state</b> (set independently). Terminal capex is the maintenance level; growth capex fades with growth on top of it.</li>
     <li>Working-capital days: <b>average balance, on sales</b> (average NWC ÷ revenue × 365), applied to the company and all peers.</li>
     <li>Float interest: earned on the <b>average annual float balance</b>, after tax, where working capital is negative.</li>
     <li>Asset turnover and the D&amp;A rate: on the <b>average net-fixed-asset base</b> (opening and closing).</li>
@@ -281,7 +281,11 @@ function engine(wOv, prof) {
   const daAt = t => rampTo(da0, daT, t, nC);   // maintenance / D&A rate ramps current → terminal
   const kd = (g, d) => (d/365) * 2 * (1 + g) / (2 + g);
   const rev = [1], gs = [S.g1];
-  for (let t = 1; t <= H1; t++) { const g = t <= S.X ? S.g1 : S.gT; gs.push(g); rev.push(rev[t-1]*(1+g)); }
+  /* growth glides linearly from LTM growth (year 1) to terminal growth over the glide-path duration (S.X) */
+  for (let t = 1; t <= H1; t++) {
+    const g = t >= S.X ? S.gT : (S.X > 1 ? S.g1 + (S.gT - S.g1) * (t - 1) / (S.X - 1) : S.gT);
+    gs.push(g); rev.push(rev[t-1]*(1+g));
+  }
   const e1 = mAt(1) * rev[1];
   let op = 0, wc = 0, fx = 0, mt = 0, sb = 0, fi = 0, Bprev = kd(S.g1, d0) * rev[0];
   const rows = [];
@@ -599,7 +603,7 @@ function drawBridge(r, B, adj) {
   el('text', { x: xT + barW/2, y: topT - 6, 'text-anchor':'middle', 'font-size': 11.5, 'font-weight': 600, fill: cssVar('--ink-1'), text: fmtX(fair) }, svg);
   el('text', { x: xT + barW/2, y: H - 8, 'text-anchor':'middle', 'font-size': 11, 'font-weight': 600, fill: cssVar('--ink-1'), text: 'Fair Multiple' }, svg);
   host.appendChild(svg);
-  $('bridgeSub').textContent = S.basis + ' EV/EBITDA turns. Required return ' + (S.w*100).toFixed(2) + '%; revenue growth ' + (S.g1*100).toFixed(1) + '% for ' + S.X + ' years, then ' + (S.gT*100).toFixed(1) + '%; margin ' + (S.m*100).toFixed(1) + '%' + (Math.abs(S.mT - S.m) > 1e-9 ? ' → ' + (S.mT*100).toFixed(1) + '%' : '') + '. Dashed line: traded multiple of ' + fmtX(S.mkt) + '.';
+  $('bridgeSub').textContent = S.basis + ' EV/EBITDA turns. Required return ' + (S.w*100).toFixed(2) + '%; revenue growth glides from ' + (S.g1*100).toFixed(1) + '% to ' + (S.gT*100).toFixed(1) + '% over ' + S.X + ' years; margin ' + (S.m*100).toFixed(1) + '%' + (Math.abs(S.mT - S.m) > 1e-9 ? ' → ' + (S.mT*100).toFixed(1) + '%' : '') + '. Dashed line: traded multiple of ' + fmtX(S.mkt) + '.';
 }
 
 /* ---------- fragility ---------- */
@@ -612,7 +616,7 @@ function drawBridge(r, B, adj) {
 const AXES = {
   w:  { label: 'Required return',    min: 6, max: 30,  toS: v => S.w = v/100,  of: () => S.w*100,  fmt: v => v.toFixed(0) + '%' },
   gT: { label: 'Terminal growth',    min: 0, max: 8,   toS: v => S.gT = v/100, of: () => S.gT*100, fmt: v => v.toFixed(1) + '%' },
-  g1: { label: 'Revenue CAGR',       min: 0, max: 40,  toS: v => S.g1 = v/100, of: () => S.g1*100, fmt: v => v.toFixed(0) + '%' },
+  g1: { label: 'LTM growth',         min: 0, max: 40,  toS: v => S.g1 = v/100, of: () => S.g1*100, fmt: v => v.toFixed(0) + '%' },
 };
 S.mapX = 'w'; S.mapY = 'gT';
 function evalFair(ax, vx, ay, vy) {
@@ -863,8 +867,8 @@ const INFO = {
   comps: 'Fair-relative multiple = peer-median EV/EBITDA + the capital-quality differential vs the median peer, on the step-2 basis. Both evaluated under the same growth and margin assumptions. India from Screener (consolidated), US from Yahoo; EV gross of cash.',
   recon: 'Every number in the fair multiple, year by year: the operating stream and each capital flow, discounted and summed. The final row reproduces the hero tile on an NTM basis.',
   reqret: 'Discount rate applied to all cash flows. Keep consistent with the currency of the cash flows.',
-  g1: 'Revenue growth over the forecast horizon.',
-  xyears: 'Years of stage-one revenue growth before reverting to the terminal rate. Independent of the margin, capex and NWC ramps.',
+  g1: 'Latest-twelve-month revenue growth — the starting point of the glide path (year one). Growth then declines linearly to the terminal rate.',
+  xyears: 'Years over which revenue growth glides linearly from the LTM rate down to terminal growth. Independent of the margin, capex and NWC ramps.',
   rampM: 'Years over which the EBITDA margin ramps linearly from current to terminal. Independent of the high-growth horizon and of the capex and NWC ramps.',
   rampC: 'Years over which capex ramps linearly from current to its terminal (maintenance) level. Independent of the other horizons.',
   rampD: 'Years over which NWC days ramp linearly from current to terminal. Independent of the other horizons.',
